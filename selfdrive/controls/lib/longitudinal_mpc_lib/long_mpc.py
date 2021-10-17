@@ -26,9 +26,9 @@ CONSTR_DIM = 4
 
 X_EGO_COST = 3.
 X_EGO_E2E_COST = 10.
-A_EGO_COST = 1.
+A_EGO_COST = 0.
 J_EGO_COST = 10.
-DANGER_ZONE_COST = 0.
+DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .5
 LIMIT_COST = 1e6
 
@@ -55,14 +55,14 @@ AUTO_TR_V = [1.4, 1.5, 1.6]
 AUTO_TR_CRUISE_GAP = 1
 
 
-def get_stopped_equivalence_factor(v_lead):
-  return T_REACT * v_lead + (v_lead*v_lead) / (2 * MAX_BRAKE)
+def get_stopped_equivalence_factor(v_lead, tr):
+  return tr * v_lead + (v_lead*v_lead) / (2 * MAX_BRAKE)
 
-def get_safe_obstacle_distance(v_ego):
-  return 2 * T_REACT * v_ego + (v_ego*v_ego) / (2 * MAX_BRAKE) + 4.0
+def get_safe_obstacle_distance(v_ego, tr):
+  return 2 * tr * v_ego + (v_ego*v_ego) / (2 * MAX_BRAKE) + 4.0
 
-def desired_follow_distance(v_ego, v_lead):
-  return get_safe_obstacle_distance(v_ego) - get_stopped_equivalence_factor(v_lead)
+def desired_follow_distance(v_ego, v_lead, tr):
+  return get_safe_obstacle_distance(v_ego, tr) - get_stopped_equivalence_factor(v_lead, tr)
 
 
 def gen_long_model():
@@ -89,7 +89,8 @@ def gen_long_model():
   x_obstacle = SX.sym('x_obstacle')
   a_min = SX.sym('a_min')
   a_max = SX.sym('a_max')
-  model.p = vertcat(a_min, a_max, x_obstacle)
+  tr = SX.sym('tr')
+  model.p = vertcat(a_min, a_max, x_obstacle, tr)
 
   # dynamics model
   f_expl = vertcat(v_ego, a_ego, j_ego)
@@ -122,11 +123,12 @@ def gen_long_mpc_solver():
 
   a_min, a_max = ocp.model.p[0], ocp.model.p[1]
   x_obstacle = ocp.model.p[2]
+  tr = ocp.model.p[3]
 
   ocp.cost.yref = np.zeros((COST_DIM, ))
   ocp.cost.yref_e = np.zeros((COST_E_DIM, ))
 
-  desired_dist_comfort = get_safe_obstacle_distance(v_ego)
+  desired_dist_comfort = get_safe_obstacle_distance(v_ego, tr)
 
   # The main cost in normal operation is how close you are to the "desired" distance
   # from an obstacle at every timestep. This obstacle can be a lead car
@@ -151,7 +153,7 @@ def gen_long_mpc_solver():
 
   x0 = np.zeros(X_DIM)
   ocp.constraints.x0 = x0
-  ocp.parameter_values = np.array([-1.2, 1.2, 0.0])
+  ocp.parameter_values = np.array([-1.2, 1.2, 0.0, T_REACT])
 
   # We put all constraint cost weights to 0 and only set them at runtime
   cost_weights = np.zeros(CONSTR_DIM)
@@ -206,7 +208,8 @@ class LongitudinalMpc():
     self.solver.set(N, "yref", self.yref[N][:COST_E_DIM])
     self.x_sol = np.zeros((N+1, X_DIM))
     self.u_sol = np.zeros((N,1))
-    self.params = np.zeros((N+1,3))
+    self.params = np.zeros((N+1,4))
+    self.param_tr = T_REACT
     for i in range(N+1):
       self.solver.set(i, 'x', np.zeros(X_DIM))
     self.last_cloudlog_t = 0
@@ -223,7 +226,7 @@ class LongitudinalMpc():
       self.set_weights_for_lead_policy()
 
   def set_weights_for_lead_policy(self):
-    W = np.diag([0.0, X_EGO_E2E_COST, 0.0, J_EGO_COST])
+    W = np.diag([X_EGO_COST, 0.0, A_EGO_COST, J_EGO_COST])
     Ws = np.tile(W[None], reps=(N,1,1))
     self.solver.cost_set_slice(0, N, 'W', Ws, api='old')
     # Setting the slice without the copy make the array not contiguous,
@@ -268,7 +271,7 @@ class LongitudinalMpc():
   def process_lead(self, lead):
     v_ego = self.x0[1]
     if lead is not None and lead.status:
-      x_lead = lead.dRel
+      x_lead = max(0, lead.dRel if lead.radar else lead.dRel - 0.5)
       v_lead = lead.vLead
       a_lead = lead.aLeadK
       a_lead_tau = lead.aLeadTau
@@ -292,34 +295,46 @@ class LongitudinalMpc():
     self.cruise_min_a = min_a
     self.cruise_max_a = max_a
 
-  def update(self, carstate, radarstate, v_cruise, x, v, a):
+  def update(self, carstate, radarstate, v_cruise):
+    v_ego = self.x0[1]
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
     lead_xv_0 = self.process_lead(radarstate.leadOne)
     lead_xv_1 = self.process_lead(radarstate.leadTwo)
 
     # set accel limits in params
-    self.params[:,0] = self.cruise_min_a
+    self.params[:,0] = interp(float(self.status), [0.0, 1.0], [self.cruise_min_a, MIN_ACCEL])
     self.params[:,1] = self.cruise_max_a
 
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance
     # and then treat that as a stopped car/obstacle at this new distance.
-    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1])
-    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1])
 
-    cruise_target = T_IDXS * v_cruise + x[0]
+    # neokii
+    cruise_gap = int(clip(carstate.cruiseGap, 1., 4.))
+    if cruise_gap == AUTO_TR_CRUISE_GAP:
+      tr = interp(carstate.vEgo, AUTO_TR_BP, AUTO_TR_V)
+    else:
+      tr = interp(float(cruise_gap), CRUISE_GAP_BP, CRUISE_GAP_V)
+    
+    self.param_tr = tr
 
-    x_targets = np.column_stack([x,
-                                lead_0_obstacle - (3/4) * get_safe_obstacle_distance(v),
-                                lead_1_obstacle - (3/4) * get_safe_obstacle_distance(v),
-                                cruise_target])
-    #self.source = SOURCES[np.argmin(x_obstacles[0])]
-    self.params[:,2] = 1e3
+    lead_0_obstacle = lead_xv_0[:,0] + get_stopped_equivalence_factor(lead_xv_0[:,1], tr)
+    lead_1_obstacle = lead_xv_1[:,0] + get_stopped_equivalence_factor(lead_xv_1[:,1], tr)
 
-    self.yref[:,1] = np.min(x_targets, axis=1)
-    self.solver.cost_set_slice(0, N, "yref", self.yref[:N], api='old')
-    self.solver.set(N, "yref", self.yref[N][:COST_E_DIM])
+    # Fake an obstacle for cruise, this ensures smooth acceleration to set speed
+    # when the leads are no factor.
+    cruise_lower_bound = v_ego + (3/4) * self.cruise_min_a * T_IDXS
+    cruise_upper_bound = v_ego + (3/4) * self.cruise_max_a * T_IDXS
+    v_cruise_clipped = np.clip(v_cruise * np.ones(N+1),
+                               cruise_lower_bound,
+                               cruise_upper_bound)
+    cruise_obstacle = T_IDXS*v_cruise_clipped + get_safe_obstacle_distance(v_cruise_clipped, tr)
+
+    x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
+    self.source = SOURCES[np.argmin(x_obstacles[0])]
+    self.params[:,2] = np.min(x_obstacles, axis=1)
+    self.params[:,3] = self.param_tr
 
     self.run()
     if (np.any(lead_xv_0[:,0] - self.x_sol[:,0] < CRASH_DISTANCE) and
@@ -336,7 +351,7 @@ class LongitudinalMpc():
     self.accel_limit_arr[:,1] = 10.
     x_obstacle = 1e5*np.ones((N+1))
     self.params = np.concatenate([self.accel_limit_arr,
-                             x_obstacle[:,None]], axis=1)
+                                  x_obstacle[:, None], np.full((N + 1, 1), self.param_tr)], axis=1)
     self.run()
 
 
