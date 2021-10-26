@@ -1,5 +1,5 @@
 import os
-
+from common.params import Params
 from selfdrive.manager.process import PythonProcess, NativeProcess, DaemonProcess
 from selfdrive.hardware import EON, TICI, PC
 
