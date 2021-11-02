@@ -13,7 +13,7 @@ STOPPING_BUFFER = 2.5 #Buffer for more comfortable stopping distance - JPR
 
 def get_radar_can_parser(CP):
 
-  if False: #Params().get_bool("NewRadarInterface"):
+  if Params().get_bool("NewRadarInterface"):
 
     signals = []
     checks = []
@@ -48,7 +48,7 @@ def get_radar_can_parser(CP):
 class RadarInterface(RadarInterfaceBase):
   def __init__(self, CP):
     super().__init__(CP)
-    self.new_radar = False #Params().get_bool("NewRadarInterface")
+    self.new_radar = Params().get_bool("NewRadarInterface")
     self.updated_messages = set()
     self.trigger_msg = 0x420 if not self.new_radar else RADAR_START_ADDR + RADAR_MSG_COUNT - 1
     self.track_id = 0
