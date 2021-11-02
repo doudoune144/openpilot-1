@@ -41,7 +41,7 @@ class CarInterface(CarInterfaceBase):
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
 
     ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool("DisableRadar") and candidate in [CAR.SONATA, CAR.SONATA_HYBRID, CAR.PALISADE, CAR.SANTA_FE]
-
+    ret.DisableRadar = Params().get_bool('DisableRadar')
     ret.pcmCruise = not ret.openpilotLongitudinalControl
 
     ret.carName = "hyundai"
@@ -477,7 +477,7 @@ class CarInterface(CarInterfaceBase):
 
     ret.enableBsm = 0x58b in fingerprint[0]
 
-    if ret.openpilotLongitudinalControl:
+    if ret.openpilotLongitudinalControl and ret.DisableRadar:
       ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
     ret.enableAutoHold = 1151 in fingerprint[0]
 
@@ -503,7 +503,7 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def init(CP, logcan, sendcan):
-    if CP.openpilotLongitudinalControl:
+    if CP.openpilotLongitudinalControl and Params().get_bool('DisableRadar'):
       disable_ecu(logcan, sendcan, addr=0x7d0, com_cont_req=b'\x28\x83\x01')
 
   def update(self, c, can_strings):
