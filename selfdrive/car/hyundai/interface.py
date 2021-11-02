@@ -45,12 +45,8 @@ class CarInterface(CarInterfaceBase):
 
     ret.communityFeature = True
 
-    eps_modified = False
-    for fw in car_fw:
-      if fw.ecu == "eps" and b"," in fw.fwVersion:
-        eps_modified = True
-
-    ret.maxSteeringAngleDeg = 90.
+    tire_stiffness_factor = 1.
+    ret.maxSteeringAngleDeg = 1000.
     UseLQR = Params().get_bool('UseLQR')
 
     # lateral LQR global hyundai
@@ -550,21 +546,12 @@ class CarInterface(CarInterfaceBase):
 
     events = self.create_common_events(ret)
 
-    # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
-    UseSMDPS = Params().get_bool('UseSMDPSHarness')
-    
-    if UseSMDPS == False and Params().get_bool('LowSpeedAlerts'):
-      if ret.vEgo < (self.CP.minSteerSpeed + 2.) and self.CP.minSteerSpeed > 10.:
-        self.low_speed_alert = True
-      if ret.vEgo > (self.CP.minSteerSpeed + 4.):
-        self.low_speed_alert = False
-      if self.low_speed_alert and not self.CS.mdps_bus:
-        events.add(EventName.belowSteerSpeed)
-
     if self.CC.longcontrol and self.CS.cruise_unavail:
       events.add(EventName.brakeUnavailable)
-    #if abs(ret.steeringAngleDeg) > self.CP.maxSteeringAngleDeg and EventName.steerSaturated not in events.events:
-      #events.add(EventName.steerSaturated)
+    #if abs(ret.steeringAngleDeg) > 90. and EventName.steerTempUnavailable not in events.events:
+    #  events.add(EventName.steerTempUnavailable)
+    if self.low_speed_alert and not self.CS.mdps_bus:
+      events.add(EventName.belowSteerSpeed)
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)
     #if self.CS.lkas_button_on != self.CS.prev_lkas_button:
