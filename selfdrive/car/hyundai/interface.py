@@ -40,6 +40,8 @@ class CarInterface(CarInterfaceBase):
 
     ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool("DisableRadar") and candidate in [CAR.SONATA, CAR.SONATA_HYBRID, CAR.PALISADE, CAR.SANTA_FE]
 
+    ret.pcmCruise = not ret.openpilotLongitudinalControl
+
     ret.carName = "hyundai"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
 
@@ -472,6 +474,9 @@ class CarInterface(CarInterfaceBase):
     ret.stoppingControl = True
 
     ret.enableBsm = 0x58b in fingerprint[0]
+
+    if ret.openpilotLongitudinalControl:
+      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
     ret.enableAutoHold = 1151 in fingerprint[0]
 
     # ignore CAN2 address if L-CAN on the same BUS
@@ -487,13 +492,17 @@ class CarInterface(CarInterfaceBase):
     ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
 
     ret.radarOffCan = ret.sccBus == -1
-    ret.pcmCruise = not ret.radarOffCan
+    #ret.pcmCruise = not ret.radarOffCan
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
     if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled'):
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
     return ret
-    
+
+  @staticmethod
+  def init(CP, logcan, sendcan):
+    if CP.openpilotLongitudinalControl:
+      disable_ecu(logcan, sendcan, addr=0x7d0, com_cont_req=b'\x28\x83\x01')
 
   def update(self, c, can_strings):
     self.cp.update_strings(can_strings)
