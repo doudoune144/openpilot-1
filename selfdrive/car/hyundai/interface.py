@@ -101,7 +101,7 @@ class CarInterface(CarInterfaceBase):
 
     ret.startAccel = -0.8
     ret.stopAccel = -2.0
-    ret.startingAccelRate = 4.0  # brake_travel/s while releasing on restart
+    ret.startingAccelRate = 5.0  # brake_travel/s while releasing on restart
     ret.stoppingDecelRate = 2.0  # brake_travel/s while trying to stop
     ret.vEgoStopping = 0.6
     ret.vEgoStarting = 0.5
@@ -113,9 +113,12 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 3.01
       ret.centerToFront = ret.wheelbase * 0.4
       ret.minSteerSpeed = 37 * CV.MPH_TO_MS
-      ret.steerRatio = 16.5
-      tire_stiffness_factor = 0.85
       ret.maxSteeringAngleDeg = 90.
+      ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+      ret.longitudinalTuning.kpV = [1.3, 0.98, 0.83, 0.75, 0.655, 0.57, 0.48]
+      ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
+      ret.longitudinalTuning.kiV = [0.08, 0.04]
+
     elif candidate == CAR.GENESIS_G70:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Genesis.png img_spinner_comma.png")
       if not UseLQR:
@@ -170,6 +173,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 16.5
       ret.centerToFront = ret.wheelbase * 0.4
       tire_stiffness_factor = 0.85
+      ret.maxSteeringAngleDeg = 90.
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
@@ -192,6 +196,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 3.45
       ret.centerToFront = ret.wheelbase * 0.4
       tire_stiffness_factor = 0.85
+      ret.maxSteeringAngleDeg = 90.
 
     elif candidate == CAR.GENESIS_G90:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Genesis.png img_spinner_comma.png")
@@ -200,6 +205,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 16.5
       ret.centerToFront = ret.wheelbase * 0.4
       tire_stiffness_factor = 0.85
+      ret.maxSteeringAngleDeg = 90.
 
       if not UseLQR:
         ret.lateralTuning.init('indi')
