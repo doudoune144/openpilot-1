@@ -12,7 +12,7 @@
 
 class HardwareEon : public HardwareNone {
 public:
-  static constexpr float MAX_VOLUME = 0.9;
+  static constexpr float MAX_VOLUME = 0.45;
   static constexpr float MIN_VOLUME = 0.45;
 
   static bool EON() { return true; }
