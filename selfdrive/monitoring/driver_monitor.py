@@ -160,22 +160,22 @@ class DriverStatus():
       self.active_monitoring_mode = False
 
   def _is_driver_distracted(self, pose, blink):
-    if not self.pose_calibrated:
-      pitch_error = pose.pitch - self.settings._PITCH_NATURAL_OFFSET
-      yaw_error = pose.yaw - self.settings._YAW_NATURAL_OFFSET
-    else:
-      pitch_error = pose.pitch - self.pose.pitch_offseter.filtered_stat.mean()
-      yaw_error = pose.yaw - self.pose.yaw_offseter.filtered_stat.mean()
+    # if not self.pose_calibrated:
+    #   pitch_error = pose.pitch - self.settings._PITCH_NATURAL_OFFSET
+    #   yaw_error = pose.yaw - self.settings._YAW_NATURAL_OFFSET
+    # else:
+    #   pitch_error = pose.pitch - self.pose.pitch_offseter.filtered_stat.mean()
+    #   yaw_error = pose.yaw - self.pose.yaw_offseter.filtered_stat.mean()
 
-    pitch_error = 0 if pitch_error > 0 else abs(pitch_error) # no positive pitch limit
-    yaw_error = abs(yaw_error)
+    # pitch_error = 0 if pitch_error > 0 else abs(pitch_error) # no positive pitch limit
+    # yaw_error = abs(yaw_error)
 
-    if pitch_error*self.settings._PITCH_WEIGHT > self.settings._METRIC_THRESHOLD*pose.cfactor or \
-       yaw_error > self.settings._METRIC_THRESHOLD*pose.cfactor:
-      return DistractedType.BAD_POSE
-    elif (blink.left_blink + blink.right_blink)*0.5 > self.settings._BLINK_THRESHOLD*blink.cfactor:
-      return DistractedType.BAD_BLINK
-    else:
+    # if pitch_error*self.settings._PITCH_WEIGHT > self.settings._METRIC_THRESHOLD*pose.cfactor or \
+    #    yaw_error > self.settings._METRIC_THRESHOLD*pose.cfactor:
+    #   return DistractedType.BAD_POSE
+    # elif (blink.left_blink + blink.right_blink)*0.5 > self.settings._BLINK_THRESHOLD*blink.cfactor:
+    #   return DistractedType.BAD_BLINK
+    # else:
       return DistractedType.NOT_DISTRACTED
 
   def set_policy(self, model_data):
@@ -254,6 +254,11 @@ class DriverStatus():
         self.awareness = max(self.awareness - self.step_change, -0.1)
 
     alert = None
+    # override 
+    self.awareness = 1.
+    self.awareness_active = 1.
+    self.awareness_passive = 1.
+
     if self.awareness <= 0.:
       # terminal red alert: disengagement required
       alert = EventName.driverDistracted if self.active_monitoring_mode else EventName.driverUnresponsive
