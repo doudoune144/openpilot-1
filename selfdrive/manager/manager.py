@@ -66,7 +66,7 @@ def manager_init():
     ("ShowDebugUI", "0"),
     ("CustomLeadMark", "0"),
     ("HyundaiNaviSL", "0"),
-    ("DisableOpFcw", "0"),
+    ("DisableOpFcw", "1"),
     ("NewRadarInterface", "0"),
     ("LowSpeedAlerts", "1"),
   ]
