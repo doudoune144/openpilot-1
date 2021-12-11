@@ -13,16 +13,14 @@ from selfdrive.config import Conversions as CV
 from selfdrive.swaglog import cloudlog
 from selfdrive.boardd.boardd import can_list_to_can_capnp
 from selfdrive.car.car_helpers import get_car, get_startup_event, get_one_can
-from selfdrive.controls.lib.lane_planner import CAMERA_OFFSET
-from selfdrive.controls.lib.drive_helpers import update_v_cruise, initialize_v_cruise
-from selfdrive.controls.lib.drive_helpers import get_lag_adjusted_curvature
+from selfdrive.controls.lib.drive_helpers import update_v_cruise, initialize_v_cruise, get_lag_adjusted_curvature
 from selfdrive.controls.lib.longcontrol import LongControl
 from selfdrive.controls.lib.latcontrol_pid import LatControlPID
 from selfdrive.controls.lib.latcontrol_indi import LatControlINDI
 from selfdrive.controls.lib.latcontrol_lqr import LatControlLQR
 from selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from selfdrive.controls.lib.events import Events, ET
-from selfdrive.controls.lib.alertmanager import AlertManager
+from selfdrive.controls.lib.alertmanager import AlertManager, set_offroad_alert
 from selfdrive.controls.lib.vehicle_model import VehicleModel
 from selfdrive.locationd.calibrationd import Calibration
 from selfdrive.hardware import HARDWARE, TICI, EON
@@ -30,11 +28,12 @@ from selfdrive.manager.process_config import managed_processes
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get
 
-LDW_MIN_SPEED = 31 * CV.MPH_TO_MS
-LANE_DEPARTURE_THRESHOLD = 0.1
+LDW_MIN_SPEED = 20 * CV.MPH_TO_MS
+LANE_DEPARTURE_THRESHOLD = 0.01
 STEER_ANGLE_SATURATION_TIMEOUT = 1.0 / DT_CTRL
 STEER_ANGLE_SATURATION_THRESHOLD = 2.5  # Degrees
 
+REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 NOSENSOR = "NOSENSOR" in os.environ
 IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged", "tombstoned",
@@ -149,6 +148,7 @@ class Controls:
     self.v_cruise_kph = 255
     self.v_cruise_kph_last = 0
     self.mismatch_counter = 0
+    self.cruise_mismatch_counter = 0
     self.can_error_counter = 0
     self.last_blinker_frame = 0
     self.saturated_count = 0
@@ -188,6 +188,10 @@ class Controls:
       self.events.add(EventName.communityFeatureDisallowed, static=True)
     if not car_recognized:
       self.events.add(EventName.carUnrecognized, static=True)
+      if len(self.CP.carFw) > 0:
+        set_offroad_alert("Offroad_CarUnrecognized", True)
+      else:
+        set_offroad_alert("Offroad_NoFirmware", True)
     elif self.read_only:
       self.events.add(EventName.dashcamMode, static=True)
     elif self.joystick_mode:
@@ -207,7 +211,10 @@ class Controls:
 
     # Handle startup event
     if self.startup_event is not None:
-      self.events.add(self.startup_event)
+      if Params().get_bool('spasEnabled'):
+        self.events.add(EventName.spasStartup)
+      else:
+        self.events.add(self.startup_event)
       self.startup_event = None
 
     # Don't add any more events if not initialized
@@ -282,9 +289,7 @@ class Controls:
       if log.PandaState.FaultType.relayMalfunction in pandaState.faults:
         self.events.add(EventName.relayMalfunction)
 
-    if not self.sm['liveParameters'].valid:
-      self.events.add(EventName.vehicleModelInvalid)
-
+    # Check for HW or system issues
     if len(self.sm['radarState'].radarErrors):
       self.events.add(EventName.radarFault)
     elif not self.sm.valid["pandaStates"]:
@@ -299,6 +304,8 @@ class Controls:
     else:
       self.logged_comm_issue = False
 
+    if not self.sm['liveParameters'].valid:
+      self.events.add(EventName.vehicleModelInvalid)
     if not self.sm['lateralPlan'].mpcSolutionValid and not (EventName.turningIndicatorOn in self.events.names):
       self.events.add(EventName.plannerError)
     if not self.sm['liveLocationKalman'].sensorsOK and not NOSENSOR:
@@ -312,10 +319,18 @@ class Controls:
       if log.PandaState.FaultType.relayMalfunction in pandaState.faults:
         self.events.add(EventName.relayMalfunction)
 
+    if not REPLAY:
+      # Check for mismatch between openpilot and car's PCM
+      cruise_mismatch = CS.cruiseState.enabledAcc and (not self.enabled or not self.CP.pcmCruise)
+      self.cruise_mismatch_counter = self.cruise_mismatch_counter + 1 if cruise_mismatch else 0
+      if self.cruise_mismatch_counter > int(1. / DT_CTRL):
+        self.events.add(EventName.cruiseMismatch)
+
+    # Check for FCW
     stock_long_is_braking = self.enabled and not self.CP.openpilotLongitudinalControl and CS.aEgo < -1.5
     model_fcw = self.sm['modelV2'].meta.hardBrakePredicted and not CS.brakePressed and not stock_long_is_braking
     planner_fcw = self.sm['longitudinalPlan'].fcw and self.enabled
-    if not self.disable_op_fcw and (planner_fcw or model_fcw):
+    if not self.disable_op_fcw and CS.vEgo > 0.01 and (planner_fcw or model_fcw):
       self.events.add(EventName.fcw)
 
     if TICI:
@@ -420,7 +435,7 @@ class Controls:
 
     SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
 
-    # decrease the soft disable timer at every step, as it's reset on
+    # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state
     self.soft_disable_timer = max(0, self.soft_disable_timer - 1)
 
@@ -442,7 +457,7 @@ class Controls:
         if self.state == State.enabled:
           if self.events.any(ET.SOFT_DISABLE):
             self.state = State.softDisabling
-            self.soft_disable_timer = 50   # 0.5s
+            self.soft_disable_timer = int(0.5 / DT_CTRL)
             self.current_alert_types.append(ET.SOFT_DISABLE)
 
         # SOFT DISABLING
@@ -494,7 +509,7 @@ class Controls:
     x = max(params.stiffnessFactor, 0.1)
     #sr = max(params.steerRatio, 0.1)
 
-    if ntune_common_enabled('useLiveSteerRatio'):
+    if ntune_common_enabled('useLiveSteerRatio'): # or CS.mdps11Stat == 5: # Don't use nTune steer ratio when SPAS active- JPR
       sr = max(params.steerRatio, 0.1)
     else:
       sr = max(ntune_common_get('steerRatio'), 0.1)
@@ -515,6 +530,11 @@ class Controls:
     if not self.active:
       self.LaC.reset()
       self.LoC.reset(v_pid=CS.vEgo)
+    if Params().get_bool('spasEnabled'):
+      if CS.mdps11Stat == 5:
+        self.LaC.reset()
+        if Params().get_bool('SPASDebug'):
+          print("Lac Reset!")
 
     if not CS.cruiseState.enabledAcc:
       self.LoC.reset(v_pid=CS.vEgo)
@@ -532,6 +552,8 @@ class Controls:
                                                                              lat_plan.curvatureRates)
       actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(lat_active, CS, self.CP, self.VM, params,
                                                                              desired_curvature, desired_curvature_rate)
+      actuators.steeringAngleDeg = (math.degrees(self.VM.get_steer_from_curvature(-desired_curvature, CS.vEgo)) * 180) / 200
+      actuators.steeringAngleDeg += params.angleOffsetDeg                                                                             
     else:
       lac_log = log.ControlsState.LateralDebugState.new_message()
       if self.sm.rcv_frame['testJoystick'] > 0 and self.active:
@@ -561,8 +583,9 @@ class Controls:
 
       if len(lat_plan.dPathPoints):
         # Check if we deviated from the path
-        left_deviation = actuators.steer > 0 and lat_plan.dPathPoints[0] < -0.1
-        right_deviation = actuators.steer < 0 and lat_plan.dPathPoints[0] > 0.1
+        # TODO use desired vs actual curvature
+        left_deviation = actuators.steer > 0 and lat_plan.dPathPoints[0] < -0.20
+        right_deviation = actuators.steer < 0 and lat_plan.dPathPoints[0] > 0.20
 
         if left_deviation or right_deviation:
           self.events.add(EventName.steerSaturated)
@@ -596,6 +619,10 @@ class Controls:
     CC.enabled = self.enabled
     CC.active = self.active
     CC.actuators = actuators
+
+    if len(self.sm['liveLocationKalman'].orientationNED.value) > 2:
+      CC.roll = self.sm['liveLocationKalman'].orientationNED.value[0]
+      CC.pitch = self.sm['liveLocationKalman'].orientationNED.value[1]
 
     CC.cruiseControl.cancel = self.CP.pcmCruise and not self.enabled and CS.cruiseState.enabled
     if self.joystick_mode and self.sm.rcv_frame['testJoystick'] > 0 and self.sm['testJoystick'].buttons[0]:

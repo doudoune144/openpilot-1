@@ -42,10 +42,10 @@ void calibration_thread(bool wide_camera) {
 
   while (!do_exit) {
     sm.update(100);
-    if(sm.updated("liveCalibration")){
+    if(sm.updated("liveCalibration")) {
       auto extrinsic_matrix = sm["liveCalibration"].getLiveCalibration().getExtrinsicMatrix();
       Eigen::Matrix<float, 3, 4> extrinsic_matrix_eigen;
-      for (int i = 0; i < 4*3; i++){
+      for (int i = 0; i < 4*3; i++) {
         extrinsic_matrix_eigen(i / 4, i % 4) = extrinsic_matrix[i];
       }
 
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
   model_init(&model, device_id, context);
   LOGW("models loaded, modeld starting");
 
-  VisionIpcClient vipc_client = VisionIpcClient("camerad", wide_camera ? VISION_STREAM_YUV_WIDE : VISION_STREAM_YUV_BACK, true, device_id, context);
+  VisionIpcClient vipc_client = VisionIpcClient("camerad", wide_camera ? VISION_STREAM_WIDE_ROAD : VISION_STREAM_ROAD, true, device_id, context);
   while (!do_exit && !vipc_client.connect(false)) {
     util::sleep_for(100);
   }

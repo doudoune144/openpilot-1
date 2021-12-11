@@ -34,7 +34,7 @@ class NvgWindow : public CameraViewWidget {
   Q_OBJECT
 
 public:
-  explicit NvgWindow(VisionStreamType type, QWidget* parent = 0) : CameraViewWidget(type, true, parent) {}
+  explicit NvgWindow(VisionStreamType type, QWidget* parent = 0) : CameraViewWidget("camerad", type, true, parent) {}
 
 #ifdef QCOM2
   ScreenRecoder* recorder;
@@ -43,6 +43,7 @@ public:
 protected:
   void paintGL() override;
   void initializeGL() override;
+  void showEvent(QShowEvent *event) override;
   double prev_draw_t = 0;
 };
 

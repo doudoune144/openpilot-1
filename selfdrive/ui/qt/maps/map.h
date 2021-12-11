@@ -22,10 +22,6 @@
 #include "selfdrive/common/util.h"
 #include "cereal/messaging/messaging.h"
 
-//const QString MAPBOX_TOKEN = util::getenv("MAPBOX_TOKEN").c_str();
-const QString MAPBOX_TOKEN = QString::fromStdString(Params().get("MapboxToken"));
-const QString MAPS_HOST = util::getenv("MAPS_HOST", MAPBOX_TOKEN.isEmpty() ? "https://maps.comma.ai" : "https://api.mapbox.com").c_str();
-
 class MapInstructions : public QWidget {
   Q_OBJECT
 
@@ -37,6 +33,7 @@ private:
   QWidget *lane_widget;
   QHBoxLayout *lane_layout;
   bool error = false;
+  bool is_rhd = false;
 
 public:
   MapInstructions(QWidget * parent=nullptr);
@@ -115,6 +112,7 @@ private:
   MapETA* map_eta;
 
   void clearRoute();
+  uint64_t route_rcv_frame = 0;
 
 private slots:
   void timerUpdate();

@@ -1,14 +1,13 @@
-#!/usr/bin/env python3
-import os
+#/!/usr/bin/env python3
 import time
 import json
 import jwt
+from pathlib import Path
 
 from datetime import datetime, timedelta
 from common.api import api_get
 from common.params import Params
 from common.spinner import Spinner
-from common.file_helpers import mkdirs_exists_ok
 from common.basedir import PERSIST
 from selfdrive.controls.lib.alertmanager import set_offroad_alert
 from selfdrive.hardware import HARDWARE

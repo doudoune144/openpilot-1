@@ -104,6 +104,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     wideRoadCameraError @102;
     localizerMalfunction @103;
     highCpuUsage @105;
+    cruiseMismatch @106;
 
     driverMonitorLowAccDEPRECATED @68;
     radarCanErrorDEPRECATED @15;
@@ -127,10 +128,11 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     startupOneplusDEPRECATED @82;
     startupFuzzyFingerprintDEPRECATED @97;
     
-    turningIndicatorOn @106;
-    autoLaneChange @107;
-    slowingDownSpeed @108;
-    slowingDownSpeedSound @109;
+    turningIndicatorOn @107;
+    autoLaneChange @108;
+    slowingDownSpeed @109;
+    slowingDownSpeedSound @110;
+    spasStartup @111;
   }
 }
 
@@ -163,6 +165,7 @@ struct CarState {
   steeringRateDeg @15 :Float32;
   steeringTorque @8 :Float32;      # TODO: standardize units
   steeringTorqueEps @27 :Float32;  # TODO: standardize units
+  steeringWheelTorque @43:Float32;
   steeringPressed @9 :Bool;        # if the user is using the steering wheel
   steeringRateLimited @29 :Bool;   # if the torque is limited by the rate limiter
   steerWarning @35 :Bool;          # temporary steer unavailble
@@ -202,6 +205,8 @@ struct CarState {
   cruiseGap @40 : Int32;
   autoHold @41 : Int32;
   tpms @42 : Tpms;
+  mdps11Stat @44 : Int32;
+  vCluRatio @45 :Float32;
 
   struct Tpms {
     fl @0 :Float32;
@@ -308,11 +313,13 @@ struct CarControl {
   active @7 :Bool;
 
   actuators @6 :Actuators;
+  roll @8 :Float32;
+  pitch @9 :Float32;
 
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
 
-  sccSmoother @8 :SccSmoother;
+  sccSmoother @10 :SccSmoother;
 
   struct SccSmoother {
     longControl @0:Bool;
@@ -383,15 +390,19 @@ struct CarControl {
 
     enum AudibleAlert {
       none @0;
-      chimeEngage @1;
-      chimeDisengage @2;
-      chimeError @3;
-      chimeWarning1 @4; # unused
-      chimeWarningRepeat @5;
-      chimeWarningRepeatInfinite @6;
-      chimePrompt @7;
-      chimeWarning2RepeatInfinite @8;
-      chimeSlowingDownSpeed @9;
+
+      engage @1;
+      disengage @2;
+      refuse @3;
+
+      warningSoft @4;
+      warningImmediate @5;
+
+      prompt @6;
+      promptRepeat @7;
+      promptDistracted @8;
+      
+      slowingDownSpeed @9;
     }
   }
 
@@ -475,18 +486,22 @@ struct CarParams {
   fingerprintSource @49: FingerprintSource;
   networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
 
+  wheelSpeedFactor @63 :Float32; # Multiplier on wheels speeds to computer actual speeds
+
   struct SafetyConfig {
     safetyModel @0 :SafetyModel;
     safetyParam @1 :Int16;
   }
   
-  mdpsBus @63: Int8;
-  sasBus @64: Int8;
-  sccBus @65: Int8;
-  enableAutoHold @66 :Bool;
-  hasScc13 @67 :Bool;
-  hasScc14 @68 :Bool;
-  hasEms @69 :Bool;
+  mdpsBus @64: Int8;
+  sasBus @65: Int8;
+  sccBus @66: Int8;
+  enableAutoHold @67 :Bool;
+  hasScc13 @68 :Bool;
+  hasScc14 @69 :Bool;
+  hasEms @70 :Bool;
+  spasEnabled @71: Bool;
+  emsType @72: Int8;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
@@ -561,7 +576,7 @@ struct CarParams {
     allOutput @17;
     gmAscm @18;
     noOutput @19;  # like silent but without silent CAN TXs
-    hondaBoschHarness @20;
+    hondaBosch @20;
     volkswagenPq @21;
     subaruLegacy @22;  # pre-Global platform
     hyundaiLegacy @23;

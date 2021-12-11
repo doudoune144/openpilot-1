@@ -56,10 +56,11 @@ class ParamsLearner:
     elif which == 'carState':
       self.steering_angle = msg.steeringAngleDeg
       self.steering_pressed = msg.steeringPressed
+      self.mdps11Stat = msg.mdps11Stat
       self.speed = msg.vEgo
 
       in_linear_region = abs(self.steering_angle) < 45 or not self.steering_pressed
-      self.active = self.speed > 7. and in_linear_region
+      self.active = self.speed > 5 and in_linear_region
 
       if self.active:
         self.kf.predict_and_observe(t, ObservationKind.STEER_ANGLE, np.array([[math.radians(msg.steeringAngleDeg)]]))
@@ -69,7 +70,6 @@ class ParamsLearner:
       # Reset time when stopped so uncertainty doesn't grow
       self.kf.filter.set_filter_time(t)
       self.kf.filter.reset_rewind()
-
 
 def main(sm=None, pm=None):
   gc.disable()
@@ -165,17 +165,22 @@ def main(sm=None, pm=None):
       msg.liveParameters.angleOffsetAverageStd = float(P[States.ANGLE_OFFSET])
       msg.liveParameters.angleOffsetFastStd = float(P[States.ANGLE_OFFSET_FAST])
 
-      if sm.frame % 1200 == 0:  # once a minute
-        params = {
+    #  if sm.frame % 1200 == 0 and Params().get_bool('spasEnabled'): #sm['carState'].mdps11Stat == 5:  # once a minute and SPAS enabled - TO DO - when active mdps11 state 5 - JPR
+    #    params = {
+    #      'carFingerprint': CP.carFingerprint,
+    #      'steerRatio': CP.steerRatio,
+    #      'stiffnessFactor': msg.liveParameters.stiffnessFactor,
+    #      'angleOffsetAverageDeg': msg.liveParameters.angleOffsetAverageDeg,
+    #    }
+      if sm.frame % 1200 == 0:
+         params = {
           'carFingerprint': CP.carFingerprint,
           'steerRatio': msg.liveParameters.steerRatio,
           'stiffnessFactor': msg.liveParameters.stiffnessFactor,
           'angleOffsetAverageDeg': msg.liveParameters.angleOffsetAverageDeg,
         }
-        put_nonblocking("LiveParameters", json.dumps(params))
-
+      put_nonblocking("LiveParameters", json.dumps(params))
       pm.send('liveParameters', msg)
-
 
 if __name__ == "__main__":
   main()

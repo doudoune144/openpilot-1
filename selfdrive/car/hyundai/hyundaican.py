@@ -113,9 +113,12 @@ def create_mdps12(packer, frame, mdps12):
 
   return packer.make_can_msg("MDPS12", 2, values)
 
-def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc11, active_cam, stock_cam):
+def create_scc11(packer, frame, enabled, set_speed, lead_visible, gapsetting, scc_live, scc11, active_cam, stock_cam):
   values = copy.copy(scc11)
   values["AliveCounterACC"] = frame // 2 % 0x10
+  values["ObjValid"] = lead_visible
+  values["ACC_ObjStatus"] = lead_visible
+  values["TauGapSet"] = gapsetting
 
   if not stock_cam:
     values["Navi_SCC_Camera_Act"] = 2 if active_cam else 0
@@ -125,7 +128,6 @@ def create_scc11(packer, frame, enabled, set_speed, lead_visible, scc_live, scc1
     values["MainMode_ACC"] = 1
     values["VSetDis"] = set_speed
     values["ObjValid"] = 1 if enabled else 0
-#  values["ACC_ObjStatus"] = lead_visible
 
   return packer.make_can_msg("SCC11", 0, values)
 
@@ -189,3 +191,43 @@ def create_scc14(packer, enabled, e_vgo, standstill, accel, gaspressed, objgap, 
 
   return packer.make_can_msg("SCC14", 0, values)
 
+def create_spas11(packer, car_fingerprint, frame, en_spas, apply_steer, bus):
+  values = {
+    "CF_Spas_Stat": en_spas,
+    "CF_Spas_TestMode": 0,
+    "CR_Spas_StrAngCmd": apply_steer,
+    "CF_Spas_BeepAlarm": 0,
+    "CF_Spas_Mode_Seq": 2,
+    "CF_Spas_AliveCnt": frame % 0x200,
+    "CF_Spas_Chksum": 0,
+    "CF_Spas_PasVol": 0,
+  }
+  dat = packer.make_can_msg("SPAS11", 0, values)[2]
+  if car_fingerprint in CHECKSUM["crc8"]:
+    dat = dat[:6]
+    values["CF_Spas_Chksum"] = hyundai_checksum(dat)
+  else:
+    values["CF_Spas_Chksum"] = sum(dat[:6]) % 256
+  return packer.make_can_msg("SPAS11", bus, values)
+
+def create_spas12(bus):
+  return [1268, 0, b"\x00\x00\x00\x00\x00\x00\x00\x00", bus]
+  
+def create_ems_366(packer, ems_366, enabled):
+  values = ems_366
+  if enabled:
+    values["VS"] = 1
+  return packer.make_can_msg("EMS_366", 1, values)
+
+def create_ems11(packer, ems11, enabled):
+  values = ems11
+  if enabled:
+    values["VS"] = 1
+  return packer.make_can_msg("EMS11", 1, values)
+
+def create_eems11(packer, eems11, enabled):
+  values = eems11
+  if enabled:
+    values["Accel_Pedal_Pos"] = 1
+    values["CR_Vcu_AccPedDep_Pos"] = 1
+  return packer.make_can_msg("E_EMS11", 1, values)

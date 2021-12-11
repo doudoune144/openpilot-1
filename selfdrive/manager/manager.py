@@ -19,23 +19,26 @@ from selfdrive.manager.process import ensure_running, launcher
 from selfdrive.manager.process_config import managed_processes
 from selfdrive.athena.registration import register, UNREGISTERED_DONGLE_ID
 from selfdrive.swaglog import cloudlog, add_file_handler
-from selfdrive.version import dirty, get_git_commit, version, origin, branch, commit, \
-                              terms_version, training_version, comma_remote, \
-                              get_git_branch, get_git_remote
+from selfdrive.version import get_dirty, get_commit, get_version, get_origin, get_short_branch, \
+                              terms_version, training_version, get_comma_remote
 from selfdrive.hardware.eon.apk import system
 
 sys.path.append(os.path.join(BASEDIR, "pyextra"))
 
-def manager_init():
 
+def manager_init():
   # update system time from panda
   set_time(cloudlog)
+
+  # save boot log
+  #subprocess.call("./bootlog", cwd=os.path.join(BASEDIR, "selfdrive/loggerd"))
 
   params = Params()
   params.clear_all(ParamKeyType.CLEAR_ON_MANAGER_START)
 
   default_params = [
-
+    ("CompletedTrainingVersion", "0"),
+    ("HasAcceptedTerms", "0"),
     ("OpenpilotEnabledToggle", "1"),
     ("CommunityFeaturesToggle", "1"),
     ("IsMetric", "1"),
@@ -51,6 +54,9 @@ def manager_init():
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
     ("StockNaviDecelEnabled", "0"),
+    ("KeepSteeringTurnSignals", "0"),
+    ("NoMinLaneChangeSpeed", "0"),
+    ("TurnSignals", "0"),
     ("ShowDebugUI", "0"),
     ("UseSMDPSHarness", "0"),
     ("SSCOD", "0"),
@@ -63,12 +69,19 @@ def manager_init():
     ("TPMS_Alerts", "1"),
     ("PutPrebuilt", "0"),
     ("StockNaviDecelEnabled", "0"),
+    ("WarningOverSpeedLimit", "0"),
     ("ShowDebugUI", "0"),
     ("CustomLeadMark", "0"),
     ("HyundaiNaviSL", "0"),
     ("DisableOpFcw", "1"),
     ("NewRadarInterface", "0"),
     ("LowSpeedAlerts", "1"),
+    ("SteerLockout", "0"),
+    ("spasEnabled", "0"),
+    ("DynamicSpas", "0"),
+    ("SpasMode", "0"),
+    ("SPASDebug", "0"),
+    ("CreepDebug", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
@@ -100,12 +113,12 @@ def manager_init():
     print("WARNING: failed to make /dev/shm")
 
   # set version params
-  params.put("Version", version)
+  params.put("Version", get_version())
   params.put("TermsVersion", terms_version)
   params.put("TrainingVersion", training_version)
-  params.put("GitCommit", get_git_commit(default=""))
-  params.put("GitBranch", get_git_branch(default=""))
-  params.put("GitRemote", get_git_remote(default=""))
+  params.put("GitCommit", get_commit(default=""))
+  params.put("GitBranch", get_short_branch(default=""))
+  params.put("GitRemote", get_origin(default=""))
 
   # set dongle id
   reg_res = register(show_spinner=True)
@@ -116,16 +129,16 @@ def manager_init():
     raise Exception(f"Registration failed for device {serial}")
   os.environ['DONGLE_ID'] = dongle_id  # Needed for swaglog
 
-  if not dirty:
+  if not get_dirty():
     os.environ['CLEAN'] = '1'
 
-  cloudlog.bind_global(dongle_id=dongle_id, version=version, dirty=dirty,
+  cloudlog.bind_global(dongle_id=dongle_id, version=get_version(), dirty=get_dirty(),
                        device=HARDWARE.get_device_type())
 
-  if comma_remote and not (os.getenv("NOLOG") or os.getenv("NOCRASH") or PC):
+  if get_comma_remote() and not (os.getenv("NOLOG") or os.getenv("NOCRASH") or PC):
     crash.init()
   crash.bind_user(id=dongle_id)
-  crash.bind_extra(dirty=dirty, origin=origin, branch=branch, commit=commit,
+  crash.bind_extra(dirty=get_dirty(), origin=get_origin(), branch=get_short_branch(), commit=get_commit(),
                    device=HARDWARE.get_device_type())
 
 
@@ -135,8 +148,13 @@ def manager_prepare():
 
 
 def manager_cleanup():
+  # send signals to kill all procs
   for p in managed_processes.values():
-    p.stop()
+    p.stop(block=False)
+
+  # ensure all are killed
+  for p in managed_processes.values():
+    p.stop(block=True)
 
   cloudlog.info("everything is dead")
 
@@ -151,9 +169,6 @@ def manager_thread():
 
   cloudlog.info("manager start")
   cloudlog.info({"environ": os.environ})
-
-  # save boot log
-  #subprocess.call("./bootlog", cwd=os.path.join(BASEDIR, "selfdrive/loggerd"))
 
   params = Params()
 
@@ -189,18 +204,24 @@ def manager_thread():
 
     started_prev = started
 
-    running_list = ["%s%s\u001b[0m" % ("\u001b[32m" if p.proc.is_alive() else "\u001b[31m", p.name)
-                    for p in managed_processes.values() if p.proc]
-    cloudlog.debug(' '.join(running_list))
+    running = ' '.join("%s%s\u001b[0m" % ("\u001b[32m" if p.proc.is_alive() else "\u001b[31m", p.name)
+                       for p in managed_processes.values() if p.proc)
+    print(running)
+    cloudlog.debug(running)
 
     # send managerState
     msg = messaging.new_message('managerState')
     msg.managerState.processes = [p.get_process_state_msg() for p in managed_processes.values()]
     pm.send('managerState', msg)
 
-    # TODO: let UI handle this
-    # Exit main loop when uninstall is needed
-    if params.get_bool("DoUninstall"):
+    # Exit main loop when uninstall/shutdown/reboot is needed
+    shutdown = False
+    for param in ("DoUninstall", "DoShutdown", "DoReboot"):
+      if params.get_bool(param):
+        cloudlog.warning(f"Shutting down manager - {param} set")
+        shutdown = True
+
+    if shutdown:
       break
 
 
@@ -229,9 +250,16 @@ def main():
   finally:
     manager_cleanup()
 
-  if Params().get_bool("DoUninstall"):
+  params = Params()
+  if params.get_bool("DoUninstall"):
     cloudlog.warning("uninstalling")
     HARDWARE.uninstall()
+  elif params.get_bool("DoReboot"):
+    cloudlog.warning("reboot")
+    HARDWARE.reboot()
+  elif params.get_bool("DoShutdown"):
+    cloudlog.warning("shutdown")
+    HARDWARE.shutdown()
 
 
 if __name__ == "__main__":

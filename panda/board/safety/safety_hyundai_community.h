@@ -6,17 +6,34 @@ int car_SCC_live = 0;
 int OP_EMS_live = 0;
 int HKG_mdps_bus = -1;
 int HKG_scc_bus = -1;
+
+const struct lookup_t HYUNDAI_LOOKUP_ANGLE_RATE_UP = { // Add to each value from car controller to leave a bit of margin.
+    {2., 30., 60.}, //kph
+    {17.5, 16.5, 15.5}};  //deg
+
+const struct lookup_t HYUNDAI_LOOKUP_ANGLE_RATE_DOWN = { // Add to each value from car controller to leave a bit of margin.
+    {2., 30., 60.}, //kph
+    {18.5, 17.5, 16.5}}; //deg 
+
+const int HYUNDAI_DEG_TO_CAN = 10; 
+
+const int HYUNDAI_SPAS_OVERRIDE_TQ = 300; // = torque_driver / 100 = NM  Set with a little headroom over the carcontroller set override torque.
+
 const CanMsg HYUNDAI_COMMUNITY_TX_MSGS[] = {
   {832, 0, 8}, {832, 1, 8}, // LKAS11 Bus 0, 1
+  {914, 0, 8}, {914, 1, 8}, // MDPS11 Bus 0, 1
   {1265, 0, 4}, {1265, 1, 4}, {1265, 2, 4}, // CLU11 Bus 0, 1, 2
   {1157, 0, 4}, // LFAHDA_MFC Bus 0
   {593, 2, 8},  // MDPS12, Bus 2
+  {897, 2, 8},  // MDPS11, Bus 2
   {1056, 0, 8}, //   SCC11,  Bus 0
   {1057, 0, 8}, //   SCC12,  Bus 0
   {1290, 0, 8}, //   SCC13,  Bus 0
   {905, 0, 8},  //   SCC14,  Bus 0
   {1186, 0, 8},  //   4a2SCC, Bus 0
+  {870, 1, 8}, // EMS_366, Bus 1
   {790, 1, 8}, // EMS11, Bus 1
+  {881, 1, 8}, // E_EMS11, Bus 1
   {912, 0, 7}, {912,1, 7}, // SPAS11, Bus 0, 1
   {1268, 0, 8}, {1268,1, 8}, // SPAS12, Bus 0, 1
  };
@@ -33,7 +50,7 @@ AddrCheckStruct hyundai_community_addr_checks[] = {
 
 addr_checks hyundai_community_rx_checks = {hyundai_community_addr_checks, HYUNDAI_COMMUNITY_ADDR_CHECK_LEN};
 
-static int hyundai_community_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
+static int hyundai_community_rx_hook(CANPacket_t *to_push) {
 
   int addr = GET_ADDR(to_push);
   int bus = GET_BUS(to_push);
@@ -87,6 +104,11 @@ static int hyundai_community_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
       update_sample(&torque_driver, torque_driver_new);
     }
 
+   if (addr == 897 && bus == HKG_mdps_bus) { // Read MDPS11, CR_Mdps_DrvTq : Driver Torque
+      driver_torque = (((GET_BYTE(to_push, 2) & 0x7F) << 5) | (GET_BYTE(to_push, 1) & 0x78)) - 2048;
+      //puts("   Driver Torque   "); puth(driver_torque); puts("\n");
+    } 
+
     if (addr == 1056 && !OP_SCC_live) { // for cars without long control
       // 2 bits: 13-14
       int cruise_engaged = GET_BYTES_04(to_push) & 0x1; // ACC main_on signal
@@ -121,18 +143,20 @@ static int hyundai_community_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
       int hyundai_speed = GET_BYTES_04(to_push) & 0x3FFF;  // FL
       hyundai_speed += (GET_BYTES_48(to_push) >> 16) & 0x3FFF;  // RL
       hyundai_speed /= 2;
-      vehicle_moving = hyundai_speed > HYUNDAI_STANDSTILL_THRSLD;
+      vehicle_moving = hyundai_speed > HYUNDAI_STANDSTILL_THRSLD;    
+      vehicle_speed = hyundai_speed;
     }
     generic_rx_checks((addr == 832 && bus == 0));
   }
   return valid;
 }
 
-static int hyundai_community_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
+static int hyundai_community_tx_hook(CANPacket_t *to_send) {
 
   int tx = 1;
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
+  bool violation = 0;
 
   if (!msg_allowed(to_send, HYUNDAI_COMMUNITY_TX_MSGS, sizeof(HYUNDAI_COMMUNITY_TX_MSGS)/sizeof(HYUNDAI_COMMUNITY_TX_MSGS[0]))) {
     tx = 0;
@@ -149,10 +173,7 @@ static int hyundai_community_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     OP_LKAS_live = 20;
     int desired_torque = ((GET_BYTES_04(to_send) >> 16) & 0x7ff) - 1024;
     uint32_t ts = microsecond_timer_get();
-    bool violation = 0;
-
     if (controls_allowed) {
-
       // *** global torque limit check ***
       bool torque_check = 0;
       violation |= torque_check = max_limit_check(desired_torque, HYUNDAI_MAX_STEER, -HYUNDAI_MAX_STEER);
@@ -193,10 +214,40 @@ static int hyundai_community_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
       rt_torque_last = 0;
       ts_last = ts;
     }
+  }
 
-    if (violation) {
-      tx = 0;
+  if (addr == 912) { // SPAS Steering Rate Limit Check
+    bool steer_enabled = ((GET_BYTE(to_send, 0) & 0xF) == 5) ? true : false; // OP SEND STATE TO MDPS If MDPS11 state 5 then steering is active. - JPR, Helped with code - Desta!
+    int mdps_state = (GET_BYTE(to_send, 0) & 0xF); // MDPS REPORTED STATE
+    int raw_angle_can = ((GET_BYTE(to_send, 2) << 8) | GET_BYTE(to_send, 1));
+    int desired_angle = to_signed(raw_angle_can, 16);
+    puts("    Desired CAN Angle   "); puth(desired_angle); puts("\n");
+    puts("    Steer Enabled   "); puth(steer_enabled); puts("\n");
+    // Rate limit check
+    if (controls_allowed && mdps_state == 5) {
+      float delta_angle_float;
+      delta_angle_float = (interpolate(HYUNDAI_LOOKUP_ANGLE_RATE_UP, vehicle_speed) * HYUNDAI_DEG_TO_CAN);
+      int delta_angle_up = (int)(delta_angle_float) + 1;
+      delta_angle_float =  (interpolate(HYUNDAI_LOOKUP_ANGLE_RATE_DOWN, vehicle_speed) * HYUNDAI_DEG_TO_CAN);
+      int delta_angle_down = (int)(delta_angle_float) + 1;
+      int highest_desired_angle = desired_angle_last + ((desired_angle_last > 0) ? delta_angle_up : delta_angle_down);
+      int lowest_desired_angle = desired_angle_last - ((desired_angle_last >= 0) ? delta_angle_down : delta_angle_up);
+      violation |= max_limit_check(desired_angle, highest_desired_angle, lowest_desired_angle);
     }
+    desired_angle_last = desired_angle;
+    if(!controls_allowed && (steer_enabled || mdps_state == 5)) {
+      violation = 1;
+      puts("  SPAS angle send not allowed: controls not allowed!"); puts("\n");
+    }
+    if (ABS(driver_torque) > HYUNDAI_SPAS_OVERRIDE_TQ && mdps_state == 5) {
+      //violation = 1; bugged 
+      puts("  Driver override torque reached : Controls Not Allowed  "); puts("\n");
+    }
+  }
+
+  if(violation) {
+    tx = 0;
+    controls_allowed = 0;
   }
 
   // FORCE CANCEL: safety check only relevant when spamming the cancel button.
@@ -212,36 +263,35 @@ static int hyundai_community_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
   if (addr == 593) {OP_MDPS_live = 20;}
   if (addr == 1265 && bus == 1) {OP_CLU_live = 20;} // only count mesage created for MDPS
   if (addr == 1057) {OP_SCC_live = 20; if (car_SCC_live > 0) {car_SCC_live -= 1;}}
-  if (addr == 790) {OP_EMS_live = 20;}
-
+  if (addr == 870 || addr == 790 || addr == 881) {OP_EMS_live = 20;}
   // 1 allows the message through
   return tx;
 }
 
-static int hyundai_community_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
+static int hyundai_community_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
   int bus_fwd = -1;
   int addr = GET_ADDR(to_fwd);
   int fwd_to_bus1 = -1;
   if (HKG_forward_bus1 || HKG_forward_obd){fwd_to_bus1 = 1;}
-
+  //if ((HKG_forward_bus1 || HKG_forward_obd) && (addr == 688 ||addr == 608 || addr == 1136 || addr == 870 || addr == 881 || addr == 790)){fwd_to_bus1 = 1;} // make easier to debug messages to MDPS for speed
   // forward cam to ccan and viceversa, except lkas cmd
   if (HKG_forward_bus2) {
     if (bus_num == 0) {
       if (!OP_CLU_live || addr != 1265 || HKG_mdps_bus == 0) {
         if (!OP_MDPS_live || addr != 593) {
-          if (!OP_EMS_live || addr != 790) {
+          if (!OP_EMS_live || (addr != 870 && addr != 790 && addr != 881)) {
             bus_fwd = fwd_to_bus1 == 1 ? 12 : 2;
           } else {
-            bus_fwd = 2;  // EON create EMS11 for MDPS
+            bus_fwd = 2;  // Comma create EMS366, EMS11, and E_EMS11 for MDPS
             OP_EMS_live -= 1;
           }
         } else {
-          bus_fwd = fwd_to_bus1;  // EON create MDPS for LKAS
+          bus_fwd = fwd_to_bus1;  // Comma create MDPS for LKAS
           OP_MDPS_live -= 1;
         }
       } else {
-        bus_fwd = 2; // EON create CLU12 for MDPS
+        bus_fwd = 2; // Comma create CLU12 for MDPS
         OP_CLU_live -= 1;
       }
     }
@@ -250,11 +300,11 @@ static int hyundai_community_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_f
         if (!OP_SCC_live || (addr != 1056 && addr != 1057 && addr != 1290 && addr != 905)) {
           bus_fwd = 20;
         } else {
-          bus_fwd = 2;  // EON create SCC11 SCC12 SCC13 SCC14 for Car
+          bus_fwd = 2;  // Comma create SCC11 SCC12 SCC13 SCC14 for Car
           OP_SCC_live -= 1;
         }
       } else {
-        bus_fwd = 0;  // EON create MDPS for LKAS
+        bus_fwd = 0;  // Comma create MDPS for LKAS
         OP_MDPS_live -= 1;
       }
     }
@@ -263,14 +313,14 @@ static int hyundai_community_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_f
         if (!OP_SCC_live || (addr != 1056 && addr != 1057 && addr != 1290 && addr != 905)) {
           bus_fwd = fwd_to_bus1 == 1 ? 10 : 0;
         } else {
-          bus_fwd = fwd_to_bus1;  // EON create SCC12 for Car
+          bus_fwd = fwd_to_bus1;  // Comma create SCC12 for Car
           OP_SCC_live -= 1;
         }
       } else if (HKG_mdps_bus == 0) {
-        bus_fwd = fwd_to_bus1; // EON create LKAS and LFA for Car
+        bus_fwd = fwd_to_bus1; // Comma create LKAS and LFA for Car
         OP_LKAS_live -= 1;
       } else {
-        OP_LKAS_live -= 1; // EON create LKAS and LFA for Car and MDPS
+        OP_LKAS_live -= 1; // Comma create LKAS and LFA for Car and MDPS
       }
     }
   } else {

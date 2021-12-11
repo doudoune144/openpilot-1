@@ -26,11 +26,12 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <optional>
 
 #include <QObject>
 #include <QTimer>
 #include <QColor>
-
+#include <QTransform>
 #include "nanovg.h"
 
 #include "cereal/messaging/messaging.h"
@@ -63,7 +64,6 @@ const int header_h = 420;
 const int footer_h = 280;
 
 const int UI_FREQ = 20;   // Hz
-
 typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
 // TODO: this is also hardcoded in common/transformations/camera.py
@@ -89,7 +89,7 @@ struct Alert {
   cereal::ControlsState::AlertSize size;
   AudibleAlert sound;
   bool equal(const Alert &a2) {
-    return text1 == a2.text1 && text2 == a2.text2 && type == a2.type;
+    return text1 == a2.text1 && text2 == a2.text2 && type == a2.type && sound == a2.sound;
   }
 
   static Alert get(const SubMaster &sm, uint64_t started_frame) {
@@ -110,7 +110,7 @@ struct Alert {
         // car is started, but controls is lagging or died
         return {"TAKE CONTROL IMMEDIATELY", "Controls Unresponsive",
                 "controlsUnresponsive", cereal::ControlsState::AlertSize::FULL,
-                AudibleAlert::CHIME_WARNING_REPEAT};
+                AudibleAlert::WARNING_IMMEDIATE};
       }
     }
     return {};
@@ -126,8 +126,8 @@ typedef enum UIStatus {
 
 const QColor bg_colors [] = {
   [STATUS_DISENGAGED] =  QColor(0x17, 0x33, 0x49, 0xc8),
-  [STATUS_ENGAGED] = QColor(0x17, 0x86, 0x44, 0x01),
-  [STATUS_WARNING] = QColor(0xDA, 0x6F, 0x25, 0x01),
+  [STATUS_ENGAGED] = QColor(0x17, 0x86, 0x44, 0xf1),
+  [STATUS_WARNING] = QColor(0xDA, 0x6F, 0x25, 0xf1),
   [STATUS_ALERT] = QColor(0xC9, 0x22, 0x31, 0xf1),
 };
 
@@ -196,8 +196,10 @@ typedef struct UIState {
   bool awake;
   bool has_prime = false;
 
-  float car_space_transform[6];
+  QTransform car_space_transform;
   bool wide_camera;
+
+  float running_time;
 
   //
   bool show_debug_ui, custom_lead_mark;
@@ -241,11 +243,11 @@ private:
   // auto brightness
   const float accel_samples = 5*UI_FREQ;
 
-  bool awake;
+  bool awake = false;
   int awake_timeout = 0;
   float accel_prev = 0;
   float gyro_prev = 0;
-  float last_brightness = 0;
+  int last_brightness = 0;
   FirstOrderFilter brightness_filter;
 
   QTimer *timer;

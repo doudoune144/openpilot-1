@@ -211,12 +211,12 @@ void cameras_init(VisionIpcServer *v, MultiCameraState *s, cl_device_id device_i
               /*fps*/ 20,
 #endif
               device_id, ctx,
-              VISION_STREAM_RGB_BACK, VISION_STREAM_YUV_BACK);
+              VISION_STREAM_RGB_BACK, VISION_STREAM_ROAD);
 
   camera_init(v, &s->driver_cam, CAMERA_ID_OV8865, 1,
               /*pixel_clock=*/72000000, /*line_length_pclk=*/1602,
               /*max_gain=*/510, 10, device_id, ctx,
-              VISION_STREAM_RGB_FRONT, VISION_STREAM_YUV_FRONT);
+              VISION_STREAM_RGB_FRONT, VISION_STREAM_DRIVER);
 
   s->sm = new SubMaster({"driverState"});
   s->pm = new PubMaster({"roadCameraState", "driverCameraState", "thumbnail"});
@@ -854,7 +854,7 @@ static void parse_autofocus(CameraState *s, uint8_t *d) {
 
 static std::optional<float> get_accel_z(SubMaster *sm) {
   sm->update(0);
-  if(sm->updated("sensorEvents")){
+  if(sm->updated("sensorEvents")) {
     for (auto event : (*sm)["sensorEvents"].getSensorEvents()) {
       if (event.which() == cereal::SensorEventData::ACCELERATION) {
         if (auto v = event.getAcceleration().getV(); v.size() >= 3)

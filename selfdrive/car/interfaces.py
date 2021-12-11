@@ -78,12 +78,13 @@ class CarInterfaceBase():
     ret.steerMaxBP = [0.]
     ret.steerMaxV = [1.]
     ret.minSteerSpeed = 0.
+    ret.wheelSpeedFactor = 1.0
 
     ret.pcmCruise = True     # openpilot's state is tied to the PCM's cruise state on most cars
     ret.minEnableSpeed = -1. # enable is done by stock ACC, so ignore this
     ret.steerRatioRear = 0.  # no rear steering, at least on the listed cars aboveA
     ret.openpilotLongitudinalControl = False
-    ret.minSpeedCan = 0.3
+    ret.minSpeedCan = 0.7
     ret.startAccel = -0.8
     ret.stopAccel = -2.0
     ret.startingAccelRate = 3.2 # brake_travel/s while releasing on restart
@@ -135,8 +136,8 @@ class CarInterfaceBase():
       events.add(EventName.speedTooHigh)
     if cs_out.cruiseState.nonAdaptive:
       events.add(EventName.wrongCruiseMode)
-    if cs_out.brakeHoldActive and self.CP.openpilotLongitudinalControl:
-      events.add(EventName.brakeHold)
+    #if cs_out.brakeHoldActive and self.CP.openpilotLongitudinalControl:
+    #  events.add(EventName.brakeHold)
 
 
     # Handle permanent and temporary steering faults
@@ -203,12 +204,34 @@ class CarStateBase:
                          C=[1.0, 0.0],
                          K=[[0.12287673], [0.29666309]])
 
+    self.v_ego_clu_kf = KF1D(x0=[[0.0], [0.0]],
+                         A=[[1.0, DT_CTRL], [0.0, 1.0]],
+                         C=[1.0, 0.0],
+                         K=[[0.12287673], [0.29666309]])
+
   def update_speed_kf(self, v_ego_raw):
     if abs(v_ego_raw - self.v_ego_kf.x[0][0]) > 2.0:  # Prevent large accelerations when car starts at non zero speed
       self.v_ego_kf.x = [[v_ego_raw], [0.0]]
 
     v_ego_x = self.v_ego_kf.update(v_ego_raw)
     return float(v_ego_x[0]), float(v_ego_x[1])
+  
+  def update_clu_speed_kf(self, v_ego_raw):
+    if abs(v_ego_raw - self.v_ego_clu_kf.x[0][0]) > 2.0:  # Prevent large accelerations when car starts at non zero speed
+      self.v_ego_clu_kf.x = [[v_ego_raw], [0.0]]
+
+    v_ego_x = self.v_ego_clu_kf.update(v_ego_raw)
+    return float(v_ego_x[0]), float(v_ego_x[1])
+
+  def get_wheel_speeds(self, fl, fr, rl, rr, unit=CV.KPH_TO_MS):
+    factor = unit * self.CP.wheelSpeedFactor
+
+    wheelSpeeds = car.CarState.WheelSpeeds.new_message()
+    wheelSpeeds.fl = fl * factor
+    wheelSpeeds.fr = fr * factor
+    wheelSpeeds.rl = rl * factor
+    wheelSpeeds.rr = rr * factor
+    return wheelSpeeds
 
   def update_blinker_from_lamp(self, blinker_time: int, left_blinker_lamp: bool, right_blinker_lamp: bool):
     """Update blinkers from lights. Enable output when light was seen within the last `blinker_time`
