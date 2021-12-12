@@ -478,16 +478,16 @@ class CarInterface(CarInterfaceBase):
         ret.minSteerSpeed = 32 * CV.MPH_TO_MS
     elif candidate in [CAR.NIRO_EV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
-      ret.mass = 2200. + STD_CARGO_KG
+      ret.mass = 2230. + STD_CARGO_KG # 265 hp version
       ret.wheelbase = 2.7
-      ret.steerRatio = 14 
-      tire_stiffness_factor = 0.7
+      ret.steerRatio = 13.73 *1.1 # 10% increase from spec
+      tire_stiffness_factor = 0.8 # works good with 17" wheels
       ret.centerToFront = ret.wheelbase * 0.4
       ret.emsType = 3 
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [4.11]
+        ret.lateralTuning.indi.innerLoopGainV = [4.1]
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [3.2]
         ret.lateralTuning.indi.timeConstantBP = [0.]
@@ -496,9 +496,9 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.actuatorEffectivenessV = [2.]
         
       ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [1.5*1.3, 1.5*0.98, 1.5*0.83, 1.5*0.75, 1.5*0.655, 1.5*0.57, 1.5*0.48]
-      ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
-      ret.longitudinalTuning.kiV = [1.5*0.08, 1.5*0.04]
+      ret.longitudinalTuning.kpV = [2.0, 1.5, 1.3, 1.1, 0.9, 0.7, 0.6]
+      ret.longitudinalTuning.kiBP = [0.,90.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
+      ret.longitudinalTuning.kiV = [0.1,0.08,0.07, 0.05]
 
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
