@@ -75,7 +75,7 @@ class CarInterface(CarInterfaceBase):
     ret.emsType = 0
 
    #Longitudinal Tune and logic for car tune
-    if candidate is not CAR.GENESIS_G70 or CAR.STINGER or CAR.GENESIS or CAR.GENESIS_G80 or CAR.KONA or CAR.KONA_EV or CAR.GENESIS_EQ900 or CAR.GENESIS_G90: #Tune for untuned cars
+    if candidate is not CAR.GENESIS_G70 or CAR.STINGER or CAR.GENESIS or CAR.GENESIS_G80 or CAR.KONA or CAR.KONA_EV or CAR.NIRO_EV or CAR.GENESIS_EQ900 or CAR.GENESIS_G90: #Tune for untuned cars
       # Donfyffe stock tune for untuned cars
       if not UseLQR:
         ret.lateralTuning.init('indi')
@@ -487,9 +487,9 @@ class CarInterface(CarInterfaceBase):
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [4.11] # last increase +0.5
+        ret.lateralTuning.indi.innerLoopGainV = [4.11]
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
-        ret.lateralTuning.indi.outerLoopGainV = [3.2] # last increase +0.5
+        ret.lateralTuning.indi.outerLoopGainV = [3.2]
         ret.lateralTuning.indi.timeConstantBP = [0.]
         ret.lateralTuning.indi.timeConstantV = [1.4]
         ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
