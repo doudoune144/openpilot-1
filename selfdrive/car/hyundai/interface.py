@@ -487,18 +487,18 @@ class CarInterface(CarInterfaceBase):
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [3.61]
+        ret.lateralTuning.indi.innerLoopGainV = [4.11]
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
-        ret.lateralTuning.indi.outerLoopGainV = [2.7]
+        ret.lateralTuning.indi.outerLoopGainV = [3.2]
         ret.lateralTuning.indi.timeConstantBP = [0.]
         ret.lateralTuning.indi.timeConstantV = [1.4]
         ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
         ret.lateralTuning.indi.actuatorEffectivenessV = [2.]
         
       ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [1.3, 0.98, 0.83, 0.75, 0.655, 0.57, 0.48]
+      ret.longitudinalTuning.kpV = [1.5*1.3, 1.5*0.98, 1.5*0.83, 1.5*0.75, 1.5*0.655, 1.5*0.57, 1.5*0.48]
       ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
-      ret.longitudinalTuning.kiV = [0.08, 0.04]
+      ret.longitudinalTuning.kiV = [1.5*0.08, 1.5*0.04]
 
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
