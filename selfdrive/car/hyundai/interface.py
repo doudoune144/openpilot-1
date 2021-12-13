@@ -37,9 +37,10 @@ class CarInterface(CarInterfaceBase):
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
 
-    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool("DisableRadar") and candidate in [CAR.SONATA, CAR.SONATA21_HEV, CAR.SONATA19_HEV, CAR.SONATA_HEV, CAR.PALISADE, CAR.SANTA_FE]
-
-    ret.pcmCruise = not ret.openpilotLongitudinalControl
+    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool('RadarDisableEnabled')
+    ret.radarDisablePossible = Params().get_bool('RadarDisableEnabled')
+    if ret.radarDisablePossible:
+      ret.radarOffCan = True
 
     ret.carName = "hyundai"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
@@ -49,7 +50,9 @@ class CarInterface(CarInterfaceBase):
     tire_stiffness_factor = 1.
     if Params().get_bool('SteerLockout'):
       ret.maxSteeringAngleDeg = 1000
+      ret.steerLockout = False
     else:
+      ret.steerLockout = True
       ret.maxSteeringAngleDeg = 90
     UseLQR = Params().get_bool('UseLQR')
     # lateral LQR global hyundai
@@ -179,7 +182,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.timeConstantV = [1.4]
         ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
         ret.lateralTuning.indi.actuatorEffectivenessV = [2.]
-
+      
       tire_stiffness_factor = 0.85
       ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
       ret.longitudinalTuning.kpV = [1.2, 0.93, 0.8, 0.68, 0.59, 0.51, 0.43]
@@ -429,7 +432,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 14.4 * 1.15   # 15% higher at the center seems reasonable - before was 14.44 
       ret.centerToFront = ret.wheelbase * 0.4
       ret.emsType = 1 
-      
+
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
@@ -442,7 +445,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.actuatorEffectivenessV = [2.]
       
       ret.longitudinalTuning.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [1.23, 1.16, 1.07, 0.98, 0.92, 0.87, 0.82]
+      ret.longitudinalTuning.kpV = [1.22, 1.155, 1.07, 0.98, 0.92, 0.87, 0.82]
       ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
       ret.longitudinalTuning.kiV = [0.05, 0.03]
 
@@ -483,7 +486,8 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 13.73 *1.1 # 10% increase from spec
       tire_stiffness_factor = 0.8 # works good with 17" wheels
       ret.centerToFront = ret.wheelbase * 0.4
-      ret.emsType = 3 
+      ret.emsType = 3
+      
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
@@ -519,11 +523,9 @@ class CarInterface(CarInterfaceBase):
       ret.centerToFront = ret.wheelbase * 0.4
       tire_stiffness_factor = 0.8
     ret.radarTimeStep = 0.05
-    
 
     if ret.centerToFront == 0:
       ret.centerToFront = ret.wheelbase * 0.4
-
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
@@ -568,10 +570,10 @@ class CarInterface(CarInterfaceBase):
     if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled'):
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
     return ret
-
+  
   @staticmethod
   def init(CP, logcan, sendcan):
-    if CP.openpilotLongitudinalControl and Params().get_bool('DisableRadar'):
+    if CP.radarDisablePossible:
       disable_ecu(logcan, sendcan, addr=0x7d0, com_cont_req=b'\x28\x83\x01')
 
   def update(self, c, can_strings):
@@ -600,9 +602,9 @@ class CarInterface(CarInterfaceBase):
 
     # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
     if ret.vEgo < (self.CP.minSteerSpeed + 0.2) and self.CP.minSteerSpeed > 10.:
-      self.low_speed_alert = True
+      self.CC.low_speed_alert = True
     if ret.vEgo > (self.CP.minSteerSpeed + 0.7):
-      self.low_speed_alert = False
+      self.CC.low_speed_alert = False
 
     buttonEvents = []
     if self.CS.cruise_buttons != self.CS.prev_cruise_buttons:
@@ -629,11 +631,11 @@ class CarInterface(CarInterfaceBase):
 
     events = self.create_common_events(ret)
 
-    if self.CC.longcontrol and self.CS.cruise_unavail:
+    if self.CC.longcontrol and self.CS.cruise_unavail and not Params().get_bool('RadarDisableEnabled'):
       events.add(EventName.brakeUnavailable)
     #if abs(ret.steeringAngleDeg) > 90. and EventName.steerTempUnavailable not in events.events:
     #  events.add(EventName.steerTempUnavailable)
-    if self.low_speed_alert and not self.CS.mdps_bus and Params().get_bool("LowSpeedAlerts"):
+    if self.CC.low_speed_alert and not self.CS.mdps_bus and Params().get_bool("LowSpeedAlerts"):
       events.add(EventName.belowSteerSpeed)
     if self.CC.turning_indicator_alert:
       events.add(EventName.turningIndicatorOn)

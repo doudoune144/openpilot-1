@@ -9,7 +9,7 @@ from common.numpy_fast import clip, interp
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
   create_scc11, create_scc12, create_scc13, create_scc14, \
-  create_mdps12, create_lfahda_mfc, create_hda_mfc, create_spas11, create_spas12, create_ems_366, create_eems11, create_ems11
+  create_mdps12, create_lfahda_mfc, create_hda_mfc, create_spas11, create_spas12, create_ems_366, create_eems11, create_ems11, create_acc_opt, create_frt_radar_opt
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerParams
 from opendbc.can.packer import CANPacker
@@ -23,8 +23,8 @@ min_set_speed = 30 * CV.KPH_TO_MS
 ###### SPAS ######
 STEER_ANG_MAX = 450 # SPAS Max Angle
 ANGLE_DELTA_BP = [0., 10., 20.]
-ANGLE_DELTA_V = [1.3, 1.2, 1.1]    # windup limit
-ANGLE_DELTA_VU = [1.4, 1.3, 1.2]   # unwind limit
+ANGLE_DELTA_V = [1.2, 1.15, 1.1]    # windup limit
+ANGLE_DELTA_VU = [1.3, 1.2, 1.15]   # unwind limit
 TQ = 290 # = TQ / 100 = NM is unit of measure for wheel.
 SPAS_SWITCH = 30 * CV.MPH_TO_MS #MPH - lowered Bc of model and overlearn steerRatio
 ###### SPAS #######
@@ -68,6 +68,11 @@ class CarController():
     self.steer_rate_limited = False
     self.lkas11_cnt = 0
     self.scc12_cnt = -1
+    self.counter_init = False
+    self.radarDisableActivated = False
+    self.radarDisableResetTimer = 0
+    self.radarDisableOverlapTimer = 0
+    self.sendaccmode = not CP.radarDisablePossible
 
     self.pcm_cnt = 0
     self.resume_cnt = 0
@@ -81,7 +86,7 @@ class CarController():
 
     self.turning_indicator_alert = False
     self.emsType = CP.emsType
-    self.turning_indicator_alert = False
+    self.low_speed_alert = False
     self.gapsettingdance = 2
     self.gapsetting = 0
     self.gapcount = 0
@@ -97,7 +102,7 @@ class CarController():
       self.assist = False
       self.override = False
       self.dynamicSpas = Params().get_bool('DynamicSpas')
-      self.ratelimit = 3.3 # Starting point - JPR
+      self.ratelimit = 2.8 # Starting point - JPR
 
     param = Params()
 
@@ -116,6 +121,9 @@ class CarController():
   def update(self, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
 
+    if enabled:
+      self.sendaccmode = enabled
+
     # Steering Torque
     new_steer = int(round(actuators.steer * CarControllerParams.STEER_MAX))
     apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque,
@@ -133,7 +141,7 @@ class CarController():
         print("apply_diff is greater than 1.5 : rate limit :", rate_limit)
         apply_angle = clip(apply_angle, CS.out.steeringAngleDeg - rate_limit, CS.out.steeringAngleDeg + rate_limit)
       elif enabled:
-        self.ratelimit = 3.3 # Reset it back to 0.5 - JPR
+        self.ratelimit = 2.8 # Reset it back to 0.5 - JPR
         if self.last_apply_angle * apply_angle > 0. and abs(apply_angle) > abs(self.last_apply_angle):
           rate_limit = interp(CS.out.vEgo, ANGLE_DELTA_BP, ANGLE_DELTA_V)
         else:
@@ -141,10 +149,10 @@ class CarController():
         apply_angle = clip(apply_angle, self.last_apply_angle - rate_limit, self.last_apply_angle + rate_limit)
 
       self.last_apply_angle = apply_angle
-      spas_active = CS.spas_enabled and enabled and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 3.5 and CS.out.vEgo < 26.82 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active)
-      lkas_active = enabled and not CS.out.steerWarning and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg and not CS.mdps11_stat == 5
+      spas_active = CS.spas_enabled and enabled and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 4 and CS.out.vEgo < 26.82 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active)
+      lkas_active = enabled and not self.low_speed_alert and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg and not CS.mdps11_stat == 5
     else:
-      lkas_active = enabled and not CS.out.steerWarning and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
+      lkas_active = enabled and not self.low_speed_alert and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
 
     if CS.spas_enabled:
       if Params().get_bool("SpasMode"):
@@ -173,6 +181,9 @@ class CarController():
 
     if not lkas_active:
       apply_steer = 0
+
+    if abs(CS.out.steeringAngleDeg) > 90 and CS.CP.steerLockout:
+      lkas_active = False
 
     self.lkas_active = lkas_active
     if CS.spas_enabled:
@@ -274,7 +285,7 @@ class CarController():
       if not lead_visible:
         self.animationSpeed = interp(CS.out.vEgo, CLUSTER_ANIMATION_BP, CLUSTER_ANIMATION_SPEED)
         print("animation speed", self.animationSpeed)
-        self.gapcount += 1 # XPS-Genesis; Adapted by JPR. Searching for lead animation 
+        self.gapcount += 1 # Dragon-Pilot; Adapted and adjusted by JPR. Searching for lead animation 
         if self.gapcount > self.animationSpeed and self.gapsettingdance == 2:
           self.gapsettingdance = 1
           self.gapcount = 0
@@ -301,7 +312,7 @@ class CarController():
     self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, controls)
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
-    if self.longcontrol and CS.cruiseState_enabled and (CS.scc_bus or not self.scc_live):
+    if self.longcontrol and CS.cruiseState_enabled and self.counter_init and (CS.scc_bus or not self.scc_live or self.radarDisableActivated):
 
       if frame % 2 == 0:
 
@@ -339,7 +350,7 @@ class CarController():
                                       self.car_fingerprint))
 
         can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.gapsetting, self.scc_live, CS.scc11,
-                                      self.scc_smoother.active_cam, stock_cam))
+                                      self.scc_smoother.active_cam, stock_cam, self.sendaccmode, CS.out.standstill, CS.lead_distance))
 
         if frame % 20 == 0 and CS.has_scc13:
           can_sends.append(create_scc13(self.packer, CS.scc13))
@@ -358,6 +369,7 @@ class CarController():
           can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
                                         obj_gap, CS.scc14))
     else:
+      self.counter_init = True
       self.scc12_cnt = -1
 
     # 20 Hz LFA MFA message
@@ -447,5 +459,13 @@ class CarController():
         can_sends.append(create_spas12(CS.mdps_bus))
       self.spas_active_last = spas_active
       self.DTQL = abs(CS.out.steeringWheelTorque)
+
+    # 5 Hz ACC options
+    if frame % 20 == 0 and CS.CP.radarDisablePossible:
+      can_sends.extend(create_acc_opt(self.packer))
+
+    # 2 Hz front radar options
+    if frame % 50 == 0 and CS.CP.radarDisablePossible:
+      can_sends.append(create_frt_radar_opt(self.packer))
 
     return can_sends
