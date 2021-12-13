@@ -491,17 +491,17 @@ class CarInterface(CarInterfaceBase):
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [4.1]
+        ret.lateralTuning.indi.innerLoopGainV = [4.1] # third tune. Highest value that still gives smooth control. Effects turning into curves.
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
-        ret.lateralTuning.indi.outerLoopGainV = [3.2]
+        ret.lateralTuning.indi.outerLoopGainV = [3.2] # forth tune. Highest value that still gives smooth control. Effects lane centering.
         ret.lateralTuning.indi.timeConstantBP = [0.]
-        ret.lateralTuning.indi.timeConstantV = [1.4]
-        ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [2.]
+        ret.lateralTuning.indi.timeConstantV = [1.4] # second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
+        ret.lateralTuning.indi.actuatorEffectivenessBP = [0., 80.*CV.KPH_TO_MS, 120.*CV.KPH_TO_MS]
+        ret.lateralTuning.indi.actuatorEffectivenessV = [1.5, 1.5, 2.0]#  first tune. Lowest value without oversteering. May vary with speed.
         
-      ret.longitudinalTuning.kpBP = [0., 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 40.*CV.KPH_TO_MS, 70.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [2.0, 1.5, 1.3, 1.1, 0.9, 0.7, 0.6]
-      ret.longitudinalTuning.kiBP = [0.,90.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
+      ret.longitudinalTuning.kpBP = [0., 20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+      ret.longitudinalTuning.kpV = [1.3, 1.3, 1.1, 0.9, 0.7, 0.6]
+      ret.longitudinalTuning.kiBP = [0.,80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
       ret.longitudinalTuning.kiV = [0.1,0.08,0.07, 0.05]
 
     elif candidate in [CAR.K7, CAR.K7_HEV]:
