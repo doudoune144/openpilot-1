@@ -355,7 +355,7 @@ class CarController():
       self.counter_init = True
       self.scc12_cnt = -1
 
-    if frame % 2 == 0 and CS.CP.openpilotLongitudinalControl and self.radarDisableActivated:
+    if frame % 2 == 0 and CS.CP.openpilotLongitudinalControl and CS.CP.radarDisablePossible:
       lead_visible = False
       accel = actuators.accel if enabled else 0
 
