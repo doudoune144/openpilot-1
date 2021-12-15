@@ -295,7 +295,7 @@ class CarController():
     self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, controls)
 
     # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
-    if self.longcontrol and CS.cruiseState_enabled and self.counter_init and (CS.scc_bus or not self.scc_live or self.radarDisableActivated):
+    if self.longcontrol and CS.cruiseState_enabled and self.counter_init and CS.scc_bus:
 
       if frame % 2 == 0:
 
@@ -354,6 +354,21 @@ class CarController():
     else:
       self.counter_init = True
       self.scc12_cnt = -1
+
+    if frame % 2 == 0 and CS.CP.openpilotLongitudinalControl and self.radarDisableActivated:
+      lead_visible = False
+      accel = actuators.accel if enabled else 0
+
+      jerk = clip(2.0 * (accel - CS.out.aEgo), -12.7, 12.7)
+
+      if accel < 0:
+        accel = interp(accel - CS.out.aEgo, [-1.0, -0.5], [2 * accel, accel])
+
+      accel = clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+
+      stopping = (actuators.longControlState == LongCtrlState.stopping)
+      can_sends.extend(create_acc_commands(self.packer, enabled, accel, jerk, int(frame / 2), lead_visible, set_speed, stopping))
+
 
     # 20 Hz LFA MFA message
     if frame % 5 == 0:
