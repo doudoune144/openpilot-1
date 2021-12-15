@@ -105,8 +105,8 @@ class CarInterface(CarInterfaceBase):
     ret.stopAccel = -2.5
     ret.startingAccelRate = 5.0  # brake_travel/s while releasing on restart
     ret.stoppingDecelRate = 0.73  # brake_travel/s while trying to stop
-    ret.vEgoStopping = 0.8
-    ret.vEgoStarting = 0.5
+    ret.vEgoStopping = 0.7
+    ret.vEgoStarting = 0.68
 
     # genesis
     if candidate == CAR.GENESIS:
@@ -429,7 +429,7 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 1.0
       ret.mass = 1640.0 + STD_CARGO_KG
       ret.wheelbase = 2.84
-      ret.steerRatio = 14.4 * 1.15   # 15% higher at the center seems reasonable - before was 14.44 
+      ret.steerRatio = 14.44 
       ret.centerToFront = ret.wheelbase * 0.4
       ret.emsType = 1 
 
