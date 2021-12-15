@@ -355,21 +355,7 @@ class CarController():
       self.counter_init = True
       self.scc12_cnt = -1
 
-    if frame % 2 == 0 and CS.CP.openpilotLongitudinalControl and self.radarDisableActivated:
-      lead_visible = False
-      accel = actuators.accel if enabled else 0
-
-      jerk = clip(2.0 * (accel - CS.out.aEgo), -12.7, 12.7)
-
-      if accel < 0:
-        accel = interp(accel - CS.out.aEgo, [-1.0, -0.5], [2 * accel, accel])
-
-      accel = clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
-
-      stopping = (actuators.longControlState == LongCtrlState.stopping)
-      can_sends.extend(create_acc_commands(self.packer, enabled, accel, jerk, int(frame / 2), lead_visible, set_speed, stopping, self.gapsetting))
-
-        # 5 Hz ACC options
+    # 5 Hz ACC options
     if frame % 20 == 0 and CS.CP.radarDisablePossible:
       can_sends.extend(create_acc_opt(self.packer))
 
