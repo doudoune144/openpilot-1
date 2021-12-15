@@ -377,8 +377,6 @@ class CarController():
     if frame % 50 == 0 and CS.CP.radarDisablePossible:
       can_sends.append(create_frt_radar_opt(self.packer))
 
-
-
     # 20 Hz LFA MFA message
     if frame % 5 == 0:
       activated_hda = road_speed_limiter_get_active()
