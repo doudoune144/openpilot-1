@@ -8,8 +8,8 @@ from common.realtime import DT_CTRL
 from common.numpy_fast import clip, interp
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.hyundai.hyundaican import create_lkas11, create_clu11, \
-  create_scc11, create_scc12, create_scc13, create_scc14, \
-  create_mdps12, create_lfahda_mfc, create_hda_mfc, create_spas11, create_spas12, create_ems_366, create_eems11, create_ems11, create_acc_opt, create_frt_radar_opt, create_acc_commands
+  create_acc_opt, create_frt_radar_opt, create_acc_commands, create_scc7d0, \
+  create_mdps12, create_lfahda_mfc, create_hda_mfc, create_spas11, create_spas12, create_ems_366, create_eems11, create_ems11, create_scc11, create_scc12, create_scc13, create_scc14
 from selfdrive.car.hyundai.scc_smoother import SccSmoother
 from selfdrive.car.hyundai.values import Buttons, CAR, FEATURES, CarControllerParams
 from opendbc.can.packer import CANPacker
@@ -19,7 +19,7 @@ from selfdrive.controls.lib.longcontrol import LongCtrlState
 from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
-min_set_speed = 30 * CV.KPH_TO_MS
+min_set_speed = 0 * CV.KPH_TO_MS
 ###### SPAS ######
 STEER_ANG_MAX = 450 # SPAS Max Angle
 ANGLE_DELTA_BP = [0., 10., 20.]
@@ -78,6 +78,7 @@ class CarController():
     self.resume_cnt = 0
     self.last_lead_distance = 0
     self.resume_wait_timer = 0
+    self.last_resume_frame = 0
 
     self.turning_signal_timer = 0
     self.cut_timer = 0
@@ -135,7 +136,7 @@ class CarController():
     if CS.spas_enabled:
       apply_angle = clip(actuators.steeringAngleDeg, -1*(STEER_ANG_MAX), STEER_ANG_MAX)
       apply_diff = abs(apply_angle - CS.out.steeringAngleDeg)
-      if apply_diff > 1.5 and enabled: # Rate limit for when steering angle is not apply_angle - JPR
+      if apply_diff > 1.8 and enabled: # Rate limit for when steering angle is not apply_angle - JPR
         self.ratelimit = self.ratelimit + 0.03 # Increase each cycle - JPR
         rate_limit = max(self.ratelimit, 10) # Make sure not to go past +-10 on rate - JPR
         print("apply_diff is greater than 1.5 : rate limit :", rate_limit)
@@ -149,7 +150,7 @@ class CarController():
         apply_angle = clip(apply_angle, self.last_apply_angle - rate_limit, self.last_apply_angle + rate_limit)
 
       self.last_apply_angle = apply_angle
-      spas_active = CS.spas_enabled and enabled and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 4.2 and CS.out.vEgo < 26.82 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active)
+      spas_active = CS.spas_enabled and enabled and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 3.8 and CS.out.vEgo < 26.82 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active)
       lkas_active = enabled and not self.low_speed_alert and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg and not CS.mdps11_stat == 5
     else:
       lkas_active = enabled and not self.low_speed_alert and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
@@ -164,7 +165,7 @@ class CarController():
       else:
         if CS.out.steeringPressed:
             self.cut_timer = 0
-        if CS.out.steeringPressed or self.cut_timer <= 70: # Keep SPAS cut for 50 cycles after steering pressed to prevent unintentional fighting. - JPR
+        if CS.out.steeringPressed or self.cut_timer <= 55: # Keep SPAS cut for 50 cycles after steering pressed to prevent unintentional fighting. - JPR
           spas_active = False
           lkas_active = True
           self.cut_timer += 1
@@ -254,51 +255,78 @@ class CarController():
         # send resume at a max freq of 10Hz
         if (frame - self.last_resume_frame) * DT_CTRL > 0.1:
           # send 25 messages at a time to increases the likelihood of resume being accepted
-          can_sends.extend([create_clu11(self.packer, frame, CS.clu11, Buttons.RES_ACCEL)] * 25)
+          can_sends.extend([create_clu11(self.packer, frame, CS.scc_bus, CS.clu11, Buttons.RES_ACCEL, clu11_speed)] * 25)
           self.last_resume_frame = frame
     
     if self.pcm_cnt == 20:
-      self.pcm_cnt = 0     
-
-    # reset lead distnce after the car starts moving
-    elif self.last_lead_distance != 0:
-      self.last_lead_distance = 0
+      self.pcm_cnt = 0 
 
     if self.longcontrol:
-      if not lead_visible:
-        self.animationSpeed = interp(CS.out.vEgo, CLUSTER_ANIMATION_BP, CLUSTER_ANIMATION_SPEED)
-        print("animation speed", self.animationSpeed)
-        self.gapcount += 1 # Dragon-Pilot; Adapted and adjusted by JPR. Searching for lead animation 
-        if self.gapcount > self.animationSpeed and self.gapsettingdance == 2:
-          self.gapsettingdance = 1
-          self.gapcount = 0
-        elif self.gapcount > self.animationSpeed and self.gapsettingdance == 1:
-          self.gapsettingdance = 4
-          self.gapcount = 0
-        elif self.gapcount > self.animationSpeed and self.gapsettingdance == 4:
-          self.gapsettingdance = 3
-          self.gapcount = 0
-        elif self.gapcount > self.animationSpeed and self.gapsettingdance == 3:
-          self.gapsettingdance = 2
-          self.gapcount = 0
-        self.gapsetting = self.gapsettingdance
-      elif 10 > CS.lead_distance > 0: # Set gap to associated distance of lead. - JPR
-        self.gapsetting = 1
-      elif 30 > CS.lead_distance > 15:
-        self.gapsetting = 2
-      elif 55 > CS.lead_distance > 30:
-        self.gapsetting = 3
-      elif CS.lead_distance > 55:
-        self.gapsetting = 4
+      if CS.CP.radarDisableOld:
+        self.radarDisableOverlapTimer += 1
+        self.radarDisableResetTimer = 0
+        if self.radarDisableOverlapTimer >= 30:
+          self.radarDisableActivated = True
+          if 200 > self.radarDisableOverlapTimer > 36:
+            if frame % 41 == 0 or self.radarDisableOverlapTimer == 37:
+              can_sends.append(create_scc7d0(b'\x02\x10\x03\x00\x00\x00\x00\x00'))
+            elif frame % 43 == 0 or self.radarDisableOverlapTimer == 37:
+              can_sends.append(create_scc7d0(b'\x03\x28\x03\x01\x00\x00\x00\x00'))
+            elif frame % 19 == 0 or self.radarDisableOverlapTimer == 37:
+              can_sends.append(create_scc7d0(b'\x02\x10\x85\x00\x00\x00\x00\x00'))  # this disables RADAR for
+        else:
+          self.counter_init = False
+          can_sends.append(create_scc7d0(b'\x02\x10\x90\x00\x00\x00\x00\x00'))  # this enables RADAR
+          can_sends.append(create_scc7d0(b'\x03\x29\x03\x01\x00\x00\x00\x00'))
+      elif self.radarDisableActivated:
+        can_sends.append(create_scc7d0(b'\x02\x10\x90\x00\x00\x00\x00\x00'))  # this enables RADAR
+        can_sends.append(create_scc7d0(b'\x03\x29\x03\x01\x00\x00\x00\x00'))
+        self.radarDisableOverlapTimer = 0
+        if frame % 50 == 0:
+          self.radarDisableResetTimer += 1
+          if self.radarDisableResetTimer > 2:
+            self.radarDisableActivated = False
+            self.counter_init = True
+      else:
+        self.radarDisableOverlapTimer = 0
+        self.radarDisableResetTimer = 0
+
+    if (frame % 50 == 0 or self.radarDisableOverlapTimer == 37) and \
+            CS.CP.radarDisableOld and self.radarDisableOverlapTimer >= 30:
+      can_sends.append(create_scc7d0(b'\x02\x3E\x00\x00\x00\x00\x00\x00'))      
+
+    if not lead_visible:
+      self.animationSpeed = interp(CS.out.vEgo, CLUSTER_ANIMATION_BP, CLUSTER_ANIMATION_SPEED)
+      self.gapcount += 1 # Dragon-Pilot; Adapted and adjusted by JPR. Searching for lead animation 
+      if self.gapcount > self.animationSpeed and self.gapsettingdance == 2:
+        self.gapsettingdance = 1
+        self.gapcount = 0
+      elif self.gapcount > self.animationSpeed and self.gapsettingdance == 1:
+        self.gapsettingdance = 4
+        self.gapcount = 0
+      elif self.gapcount > self.animationSpeed and self.gapsettingdance == 4:
+        self.gapsettingdance = 3
+        self.gapcount = 0
+      elif self.gapcount > self.animationSpeed and self.gapsettingdance == 3:
+        self.gapsettingdance = 2
+        self.gapcount = 0
+      self.gapsetting = self.gapsettingdance
+    elif 10 > CS.lead_distance > 0: # Set gap to associated distance of lead. - JPR
+      self.gapsetting = 1
+    elif 30 > CS.lead_distance > 15:
+      self.gapsetting = 2
+    elif 55 > CS.lead_distance > 30:
+      self.gapsetting = 3
+    elif CS.lead_distance > 55:
+      self.gapsetting = 4
 
     # scc smoother
     self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, controls)
 
-    # send scc to car if longcontrol enabled and SCC not on bus 0 or ont live
-    if self.longcontrol and CS.cruiseState_enabled and self.counter_init and CS.scc_bus:
+    if self.longcontrol and CS.cruiseState_enabled and not CS.CP.radarDisablePossible and (CS.scc_bus or not self.scc_live):
 
       if frame % 2 == 0:
-
+        
         stopping = controls.LoC.long_control_state == LongCtrlState.stopping
         apply_accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, apply_accel, stopping)
@@ -332,12 +360,11 @@ class CarController():
                                       CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill,
                                       self.car_fingerprint))
 
-        can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.gapsetting, self.scc_live, CS.scc11,
-                                      self.scc_smoother.active_cam, stock_cam, self.sendaccmode, CS.out.standstill, CS.lead_distance))
+        can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.gapsetting, self.scc_live, CS.scc11, self.scc_smoother.active_cam, stock_cam, self.sendaccmode, CS.out.standstill, CS.lead_distance))
 
         if frame % 20 == 0 and CS.has_scc13:
           can_sends.append(create_scc13(self.packer, CS.scc13))
-
+          
         if CS.has_scc14:
           acc_standstill = stopping if CS.out.vEgo < 2. else False
 
@@ -352,10 +379,9 @@ class CarController():
           can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
                                         obj_gap, CS.scc14))
     else:
-      self.counter_init = True
       self.scc12_cnt = -1
 
-    if frame % 2 == 0 and CS.CP.openpilotLongitudinalControl and CS.CP.radarDisablePossible:
+    if frame % 2 == 0 and CS.CP.radarDisablePossible:
       lead_visible = False
       accel = actuators.accel if enabled else 0
 
@@ -369,7 +395,7 @@ class CarController():
       stopping = (actuators.longControlState == LongCtrlState.stopping)
       can_sends.extend(create_acc_commands(self.packer, enabled, accel, jerk, int(frame / 2), lead_visible, set_speed, stopping, self.gapsetting))
 
-        # 5 Hz ACC options
+    # 5 Hz ACC options
     if frame % 20 == 0 and CS.CP.radarDisablePossible:
       can_sends.extend(create_acc_opt(self.packer))
 

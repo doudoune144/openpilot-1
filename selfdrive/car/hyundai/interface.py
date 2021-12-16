@@ -5,8 +5,7 @@ from cereal import car
 from panda import Panda
 from common.numpy_fast import interp
 from selfdrive.config import Conversions as CV
-from selfdrive.car.hyundai.values import CAR, EV_CAR, HYBRID_CAR, Buttons, CarControllerParams
-from selfdrive.car.hyundai.radar_interface import RADAR_START_ADDR
+from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, LEGACY_SAFETY_MODE_CAR
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.lateral_planner import LANE_CHANGE_SPEED_MIN
@@ -37,13 +36,23 @@ class CarInterface(CarInterfaceBase):
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
 
-    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool('RadarDisableEnabled')
-    ret.radarDisablePossible = Params().get_bool('RadarDisableEnabled')
+    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool('RadarDisableEnabled') or Params().get_bool('DisableRadar')
+    ret.radarDisable = Params().get_bool('DisableRadar')
+    ret.radarDisableOld = Params().get_bool('RadarDisableEnabled')
+    ret.radarDisablePossible = Params().get_bool('RadarDisableEnabled') or Params().get_bool('DisableRadar')
+    
     if ret.radarDisablePossible:
       ret.radarOffCan = True
+    
+    if ret.radarDisablePossible:
+      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
 
     ret.carName = "hyundai"
-    ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
+    # these cars require a special panda safety mode due to missing counters and checksums in the messages
+    if candidate in LEGACY_SAFETY_MODE_CAR:
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy)]
+    else:
+      ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
 
     ret.communityFeature = True
 
@@ -567,13 +576,13 @@ class CarInterface(CarInterfaceBase):
     ret.spasEnabled = Params().get_bool('spasEnabled')
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
-    if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled'):
+    if ret.radarOffCan and not ret.radarDisablePossible or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled') or Params().get_bool('spasEnabled') and not ret.radarDisablePossible:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
     return ret
   
   @staticmethod
   def init(CP, logcan, sendcan):
-    if CP.radarDisablePossible:
+    if CP.radarDisable:
       disable_ecu(logcan, sendcan, addr=0x7d0, com_cont_req=b'\x28\x83\x01')
 
   def update(self, c, can_strings):

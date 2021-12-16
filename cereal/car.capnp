@@ -504,6 +504,8 @@ struct CarParams {
   emsType @72: Int8;
   radarDisablePossible @73: Bool;
   steerLockout @74: Bool;
+  radarDisableOld @75: Bool;
+  radarDisable @76: Bool;
 
 
   struct LateralParams {
