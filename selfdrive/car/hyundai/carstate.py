@@ -362,7 +362,7 @@ class CarState(CarStateBase):
       ("WHL_SPD11", 50),
     ]
 
-    if not CP.radarDisablePossible:
+    if not CP.radarDisable:
       signals += [
       ("MainMode_ACC", "SCC11", 1),
       ("SCCInfoDisplay", "SCC11", 0),
@@ -410,7 +410,7 @@ class CarState(CarStateBase):
       ("ComfortBandLower", "SCC14", 0),
       ]
 
-    if CP.sccBus == 0 and CP.pcmCruise and not CP.radarDisablePossible:
+    if CP.sccBus == 0 and CP.pcmCruise and not CP.radarDisable:
       checks += [
         ("SCC11", 50),
         ("SCC12", 50),
