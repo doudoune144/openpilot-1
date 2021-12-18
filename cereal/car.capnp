@@ -502,11 +502,8 @@ struct CarParams {
   hasEms @70 :Bool;
   spasEnabled @71: Bool;
   emsType @72: Int8;
-  radarDisablePossible @73: Bool;
+  radarDisable @73: Bool;
   steerLockout @74: Bool;
-  radarDisableOld @75: Bool;
-  radarDisable @76: Bool;
-
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
