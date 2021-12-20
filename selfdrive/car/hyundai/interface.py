@@ -502,7 +502,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
         ret.lateralTuning.indi.innerLoopGainV = [4.1] # third tune. Highest value that still gives smooth control. Effects turning into curves.
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
-        ret.lateralTuning.indi.outerLoopGainV = [3.2] # forth tune. Highest value that still gives smooth control. Effects lane centering.
+        ret.lateralTuning.indi.outerLoopGainV = [2.8] # forth tune. Highest value that still gives smooth control. Effects lane centering.
         ret.lateralTuning.indi.timeConstantBP = [0.]
         ret.lateralTuning.indi.timeConstantV = [1.0] # second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
         ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
