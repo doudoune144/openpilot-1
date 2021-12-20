@@ -511,7 +511,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kpBP = [0., 20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
       ret.longitudinalTuning.kpV = [1.3, 1.3, 1.1, 0.9, 0.7, 0.6]
       ret.longitudinalTuning.kiBP = [0.,80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
-      ret.longitudinalTuning.kiV = [0.11,0.1,0.08, 0.07]
+      ret.longitudinalTuning.kiV = [0.09,0.08,0.06, 0.05]
 
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
