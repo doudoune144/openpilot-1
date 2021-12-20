@@ -59,7 +59,7 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N+1) for idx in range(N
 
 T_IDXS = np.array(T_IDXS_LST)
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-MIN_ACCEL = -4.5
+MIN_ACCEL = -6.5
 T_FOLLOW = 1.6 # factor for linear distance increase. Dominant at steady distance. Recommendation 2s
 COMFORT_BRAKE = 3. # inverse factor for quadratic distance increase. Dominant on speed diff
 STOP_DISTANCE = 6.0 # distance offset, minimum distance between cars when stopped
