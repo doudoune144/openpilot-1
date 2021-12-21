@@ -500,18 +500,18 @@ class CarInterface(CarInterfaceBase):
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [4.1] # third tune. Highest value that still gives smooth control. Effects turning into curves.
+        ret.lateralTuning.indi.innerLoopGainV = [3.8] # third tune. Highest value that still gives smooth control. Effects turning into curves.
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [2.8] # forth tune. Highest value that still gives smooth control. Effects lane centering.
         ret.lateralTuning.indi.timeConstantBP = [0.]
-        ret.lateralTuning.indi.timeConstantV = [1.0] # second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
+        ret.lateralTuning.indi.timeConstantV = [0.8] # second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
         ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-        ret.lateralTuning.indi.actuatorEffectivenessV = [1.4] #  first tune. Lowest value without oversteering. May vary with speed.
+        ret.lateralTuning.indi.actuatorEffectivenessV = [1.6] #  first tune. Lowest value without oversteering. May vary with speed.
         
       ret.longitudinalTuning.kpBP = [0., 20.*CV.KPH_TO_MS, 50.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS, 100.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
       ret.longitudinalTuning.kpV = [1.3, 1.3, 1.1, 0.9, 0.7, 0.6]
       ret.longitudinalTuning.kiBP = [0.,80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
-      ret.longitudinalTuning.kiV = [0.09,0.08,0.06, 0.05]
+      ret.longitudinalTuning.kiV = [0.08,0.07,0.05, 0.04]
 
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
