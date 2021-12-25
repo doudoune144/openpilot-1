@@ -11,6 +11,7 @@ from selfdrive.controls.lib.lane_planner import LanePlanner, TRAJECTORY_SIZE
 from selfdrive.config import Conversions as CV
 import cereal.messaging as messaging
 from cereal import log
+from decimal import Decimal
 
 AUTO_LCA_START_TIME = .1
 
@@ -74,6 +75,12 @@ class LateralPlanner:
     self.lat_mpc = LateralMpc()
     self.reset_mpc(np.zeros(6))
 
+    # lane change logic from opkr with own tuned values
+    self.lane_change_adjust = [0.1, 0.2, 0.7, 1.0]
+    self.lane_change_adjust_vel = [30*CV.KPH_TO_MS, 60*CV.KPH_TO_MS, 80*CV.KPH_TO_MS, 110*CV.KPH_TO_MS]
+    self.lane_change_adjust_factor = 2 # default comma value
+    self.lane_change_adjust_enable = True
+
   def reset_mpc(self, x0=np.zeros(6)):
     self.x0 = x0
     self.lat_mpc.reset(x0=self.x0)
@@ -123,6 +130,9 @@ class LateralPlanner:
         elif sm['carState'].rightBlinker:
           self.lane_change_direction = LaneChangeDirection.right
 
+        if self.lane_change_adjust_enable: # if not used then it remains initialized with default comma value
+          self.lane_change_adjust_factor = interp(v_ego, self.lane_change_adjust_vel, self.lane_change_adjust)
+
         self.lane_change_state = LaneChangeState.preLaneChange
         self.lane_change_ll_prob = 1.0
 
@@ -140,7 +150,7 @@ class LateralPlanner:
       # LaneChangeState.laneChangeStarting
       elif self.lane_change_state == LaneChangeState.laneChangeStarting:
         # fade out over .5s
-        self.lane_change_ll_prob = max(self.lane_change_ll_prob - 2*DT_MDL, 0.0)
+        self.lane_change_ll_prob = max(self.lane_change_ll_prob - self.lane_change_adjust_factor*DT_MDL, 0.0)
         # 98% certainty
         if lane_change_prob < 0.02 and self.lane_change_ll_prob < 0.01:
           self.lane_change_state = LaneChangeState.laneChangeFinishing
