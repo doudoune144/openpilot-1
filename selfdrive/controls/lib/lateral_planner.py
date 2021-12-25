@@ -11,7 +11,6 @@ from selfdrive.controls.lib.lane_planner import LanePlanner, TRAJECTORY_SIZE
 from selfdrive.config import Conversions as CV
 import cereal.messaging as messaging
 from cereal import log
-from decimal import Decimal
 
 AUTO_LCA_START_TIME = .1
 
