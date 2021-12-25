@@ -7,7 +7,7 @@ Ecu = car.CarParams.Ecu
 class CarControllerParams:
 
   ACCEL_MAX = 2.0
-  ACCEL_MIN = -3.7
+  ACCEL_MIN = -5.0
 
   STEER_MAX = 384   # 409 is the max, 255 is stock
   STEER_DELTA_UP = 3
@@ -420,7 +420,7 @@ DBC = {
   CAR.K9: dbc_dict('hyundai_kia_generic', None),
 }
 
-STEER_THRESHOLD = 150
+STEER_THRESHOLD = 165
 
 
 

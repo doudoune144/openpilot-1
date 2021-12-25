@@ -116,7 +116,7 @@ class CarState(CarStateBase):
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]['CR_Mdps_OutTq']
     ret.steeringWheelTorque = cp_mdps.vl["MDPS11"]['CR_Mdps_DrvTq'] 
 
-    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD + 150 if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD + 165 if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
 
     if not ret.standstill and cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
       self.mdps_error_cnt += 1
@@ -362,7 +362,7 @@ class CarState(CarStateBase):
       ("WHL_SPD11", 50),
     ]
 
-    if not CP.radarDisablePossible:
+    if not CP.radarDisable:
       signals += [
       ("MainMode_ACC", "SCC11", 1),
       ("SCCInfoDisplay", "SCC11", 0),
@@ -410,7 +410,7 @@ class CarState(CarStateBase):
       ("ComfortBandLower", "SCC14", 0),
       ]
 
-    if CP.sccBus == 0 and CP.pcmCruise and not CP.radarDisablePossible:
+    if CP.sccBus == 0 and CP.pcmCruise and not CP.radarDisable:
       checks += [
         ("SCC11", 50),
         ("SCC12", 50),

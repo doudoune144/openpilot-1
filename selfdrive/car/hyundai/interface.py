@@ -28,7 +28,7 @@ class CarInterface(CarInterfaceBase):
     v_current_kph = current_speed * CV.MS_TO_KPH
 
     gas_max_bp = [0., 10., 20., 50., 70., 130.]
-    gas_max_v = [CarControllerParams.ACCEL_MAX, 2., 1.8, 1.45, 1.15, 0.65, 0.35]
+    gas_max_v = [CarControllerParams.ACCEL_MAX, 2., 1.8, 1.5, 1.1, 0.55, 0.33]
 
     return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
 
@@ -36,16 +36,13 @@ class CarInterface(CarInterfaceBase):
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
 
-    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool('RadarDisableEnabled') or Params().get_bool('DisableRadar')
+    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool('DisableRadar')
     ret.radarDisable = Params().get_bool('DisableRadar')
-    ret.radarDisableOld = Params().get_bool('RadarDisableEnabled')
-    ret.radarDisablePossible = Params().get_bool('RadarDisableEnabled') or Params().get_bool('DisableRadar')
-    
-    if ret.radarDisablePossible:
+        # SPAS
+    ret.spasEnabled = Params().get_bool('spasEnabled')
+
+    if ret.radarDisable:
       ret.radarOffCan = True
-    
-    if ret.radarDisablePossible:
-      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
 
     ret.carName = "hyundai"
     # these cars require a special panda safety mode due to missing counters and checksums in the messages
@@ -370,13 +367,11 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
         ret.lateralTuning.indi.actuatorEffectivenessV = [2.]
 
-
  #Tune To base Kona EV tune off of.
       ret.longitudinalTuning.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
       ret.longitudinalTuning.kpV = [1.20, 1.1, 1.05, 1.0, 0.95, 0.90, 0.85]
       ret.longitudinalTuning.kiBP = [0, 130.*CV.KPH_TO_MS]
       ret.longitudinalTuning.kiV = [0.07, 0.03]
-
 
     elif candidate in [CAR.IONIQ, CAR.IONIQ_EV_LTD, CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV, CAR.IONIQ_HEV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Hyundai.png img_spinner_comma.png")
@@ -571,9 +566,6 @@ class CarInterface(CarInterfaceBase):
 
     ret.radarOffCan = ret.sccBus == -1
     #ret.pcmCruise = not ret.radarOffCan
-
-    # SPAS
-    ret.spasEnabled = Params().get_bool('spasEnabled')
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
     if ret.radarOffCan and not ret.radarDisablePossible or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled') or Params().get_bool('spasEnabled') and not ret.radarDisablePossible:
