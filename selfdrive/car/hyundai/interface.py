@@ -495,7 +495,7 @@ class CarInterface(CarInterfaceBase):
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [4.2] # third tune. Highest value that still gives smooth control. Affects turning into curves.
+        ret.lateralTuning.indi.innerLoopGainV = [4.5] # third tune. Highest value that still gives smooth control. Affects turning into curves.
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [2.6] # forth tune. Highest value that still gives smooth control. Affects lane centering.
         ret.lateralTuning.indi.timeConstantBP = [0.]
