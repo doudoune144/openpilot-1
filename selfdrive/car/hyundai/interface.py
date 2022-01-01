@@ -487,7 +487,7 @@ class CarInterface(CarInterfaceBase):
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
       ret.mass = 2230. + STD_CARGO_KG # 265 hp version
       ret.wheelbase = 2.7
-      ret.steerRatio = 13.73 *1.1 # 10% increase from spec
+      ret.steerRatio = 13.73 *1.15 # 15% increase from spec
       tire_stiffness_factor = 0.8 # works good with 17" wheels
       ret.centerToFront = ret.wheelbase * 0.4
       ret.emsType = 3
@@ -495,7 +495,7 @@ class CarInterface(CarInterfaceBase):
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [4.5] # third tune. Highest value that still gives smooth control. Affects turning into curves.
+        ret.lateralTuning.indi.innerLoopGainV = [4.2] # third tune. Highest value that still gives smooth control. Affects turning into curves.
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [2.6] # forth tune. Highest value that still gives smooth control. Affects lane centering.
         ret.lateralTuning.indi.timeConstantBP = [0.]
