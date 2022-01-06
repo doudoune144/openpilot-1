@@ -485,7 +485,7 @@ class CarInterface(CarInterfaceBase):
         ret.minSteerSpeed = 32 * CV.MPH_TO_MS
     elif candidate in [CAR.NIRO_EV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
-      ret.mass = 2230. + STD_CARGO_KG # 265 hp version
+      ret.mass = 2000. + STD_CARGO_KG # 265 hp version
       ret.wheelbase = 2.7
       ret.steerRatio = 13.73 *1.15 # 15% increase from spec
       tire_stiffness_factor = 0.8 # works good with 17" wheels
