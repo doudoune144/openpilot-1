@@ -43,6 +43,9 @@ class CarInterface(CarInterfaceBase):
 
     if ret.radarDisable:
       ret.radarOffCan = True
+    
+    #if ret.radarDisablePossible:
+      #ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
 
     ret.carName = "hyundai"
     # these cars require a special panda safety mode due to missing counters and checksums in the messages
@@ -80,7 +83,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerLimitTimer = 2.5
     ret.steerRateCost = 0.4
     ret.steerMaxBP = [0.]
-    ret.steerMaxV = [1.5]
+    ret.steerMaxV = [2.]
     ret.emsType = 0
 
    #Longitudinal Tune and logic for car tune
@@ -107,12 +110,10 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalActuatorDelayLowerBound = 0.15
     ret.longitudinalActuatorDelayUpperBound = 0.2
 
-    ret.startAccel = -0.8
     ret.stopAccel = -2.5
-    ret.startingAccelRate = 5.0  # brake_travel/s while releasing on restart
     ret.stoppingDecelRate = 0.73  # brake_travel/s while trying to stop
-    ret.vEgoStopping = 0.7
-    ret.vEgoStarting = 0.68
+    ret.vEgoStopping = 0.8
+    ret.vEgoStarting = 0.5  # needs to be >= vEgoStopping to avoid state transition oscillation
 
     # genesis
     if candidate == CAR.GENESIS:
@@ -390,12 +391,14 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.845
       ret.centerToFront = ret.wheelbase * 0.385
+      ret.steerRatio = 17.5
     elif candidate in [CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Hyundai.png img_spinner_comma.png")
       tire_stiffness_factor = 0.8
       ret.mass = 1725. + STD_CARGO_KG
       ret.wheelbase = 2.885
       ret.centerToFront = ret.wheelbase * 0.385
+      ret.steerRatio = 17.5
     elif candidate == CAR.VELOSTER:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Hyundai.png img_spinner_comma.png")
       ret.mass = 3558. * CV.LB_TO_KG
@@ -485,7 +488,7 @@ class CarInterface(CarInterfaceBase):
         ret.minSteerSpeed = 32 * CV.MPH_TO_MS
     elif candidate in [CAR.NIRO_EV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
-      ret.mass = 2000. + STD_CARGO_KG # 265 hp version
+      ret.mass = 1850. + STD_CARGO_KG # 265 hp version
       ret.wheelbase = 2.7
       ret.steerRatio = 13.73 *1.15 # 15% increase from spec
       tire_stiffness_factor = 0.8 # works good with 17" wheels
@@ -495,7 +498,7 @@ class CarInterface(CarInterfaceBase):
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
-        ret.lateralTuning.indi.innerLoopGainV = [4.1] # third tune. Highest value that still gives smooth control. Affects turning into curves.
+        ret.lateralTuning.indi.innerLoopGainV = [3.9] # third tune. Highest value that still gives smooth control. Affects turning into curves.
         ret.lateralTuning.indi.outerLoopGainBP = [0.]
         ret.lateralTuning.indi.outerLoopGainV = [2.8] # forth tune. Highest value that still gives smooth control. Affects lane centering.
         ret.lateralTuning.indi.timeConstantBP = [0.]
@@ -514,6 +517,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1650. + STD_CARGO_KG
       ret.wheelbase = 2.855
       ret.centerToFront = ret.wheelbase * 0.4
+      ret.steerRatio = 17.5
     elif candidate == CAR.SELTOS:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
       ret.mass = 1310. + STD_CARGO_KG
@@ -526,6 +530,10 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 3.15
       ret.centerToFront = ret.wheelbase * 0.4
       tire_stiffness_factor = 0.8
+      ret.lateralTuning.lqr.scale = 1650.
+      ret.lateralTuning.lqr.ki = 0.01
+      ret.lateralTuning.lqr.dcGain = 0.0027
+
     ret.radarTimeStep = 0.05
 
     if ret.centerToFront == 0:
@@ -565,10 +573,13 @@ class CarInterface(CarInterfaceBase):
     ret.hasEms = 608 in fingerprint[0] and 809 in fingerprint[0]
 
     ret.radarOffCan = ret.sccBus == -1
-    #ret.pcmCruise = not ret.radarOffCan
+    ret.pcmCruise = not ret.radarOffCan or not ret.radarDisablePossible
+
+    # SPAS
+    ret.spasEnabled = Params().get_bool('spasEnabled')
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
-    if ret.radarOffCan and not ret.radarDisablePossible or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled') or Params().get_bool('spasEnabled') and not ret.radarDisablePossible:
+    if ret.radarOffCan and not ret.radarDisablePossible or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled') or Params().get_bool('spasEnabled'):
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
     return ret
   
@@ -632,8 +643,40 @@ class CarInterface(CarInterfaceBase):
 
     events = self.create_common_events(ret)
 
-    if self.CC.longcontrol and self.CS.cruise_unavail and not Params().get_bool('RadarDisableEnabled'):
+    if self.CC.longcontrol and self.CS.cruise_unavail:
       events.add(EventName.brakeUnavailable)
+    #if abs(ret.steeringAngleDeg) > 90. and EventName.steerTempUnavailable not in events.events:
+    #  events.add(EventName.steerTempUnavailable)
+    if self.low_speed_alert and not self.CS.mdps_bus:
+      events.add(EventName.belowSteerSpeed)
+    if self.CC.turning_indicator_alert:
+      events.add(EventName.turningIndicatorOn)
+    if self.mad_mode_enabled and EventName.pedalPressed in events.events:
+      events.events.remove(EventName.pedalPressed)
+
+  # handle button presses
+    for b in ret.buttonEvents:
+      # do disable on button down
+      if b.type == ButtonType.cancel and b.pressed:
+        events.add(EventName.buttonCancel)
+      if self.CC.longcontrol and not self.CC.scc_live:
+        # do enable on both accel and decel buttons
+        if b.type in [ButtonType.accelCruise, ButtonType.decelCruise] and not b.pressed:
+          events.add(EventName.buttonEnable)
+        if EventName.wrongCarMode in events.events:
+          events.events.remove(EventName.wrongCarMode)
+        if EventName.pcmDisable in events.events:
+          events.events.remove(EventName.pcmDisable)
+      elif not self.CC.longcontrol and ret.cruiseState.enabled:
+        # do enable on decel button only
+        if b.type == ButtonType.decelCruise and not b.pressed:
+          events.add(EventName.buttonEnable)
+
+    if self.CC.longcontrol and self.CS.cruise_unavail or self.CP.radarDisablePossible and self.CS.brake_error:
+      print("cruise error")
+      events.add(EventName.brakeUnavailable)
+    if self.CS.park_brake:
+      events.add(EventName.parkBrake)
     #if abs(ret.steeringAngleDeg) > 90. and EventName.steerTempUnavailable not in events.events:
     #  events.add(EventName.steerTempUnavailable)
     if self.CC.low_speed_alert and not self.CS.mdps_bus and Params().get_bool("LowSpeedAlerts"):
@@ -654,24 +697,6 @@ class CarInterface(CarInterfaceBase):
       if self.CS.mdps11_stat == 6 or self.CS.mdps11_stat == 8:
         events.add(EventName.steerTempUnavailable)
 
-  # handle button presses
-    for b in ret.buttonEvents:
-      # do disable on button down
-      if b.type == ButtonType.cancel and b.pressed:
-        events.add(EventName.buttonCancel)
-      if self.CC.longcontrol and not self.CC.scc_live:
-        # do enable on both accel and decel buttons
-        if b.type in [ButtonType.accelCruise, ButtonType.decelCruise] and not b.pressed:
-          events.add(EventName.buttonEnable)
-        if EventName.wrongCarMode in events.events:
-          events.events.remove(EventName.wrongCarMode)
-        if EventName.pcmDisable in events.events:
-          events.events.remove(EventName.pcmDisable)
-      elif not self.CC.longcontrol and ret.cruiseState.enabled:
-        # do enable on decel button only
-        if b.type == ButtonType.decelCruise and not b.pressed:
-          events.add(EventName.buttonEnable)
-
     # scc smoother
     if self.CC.scc_smoother is not None:
       self.CC.scc_smoother.inject_events(events)
@@ -683,9 +708,9 @@ class CarInterface(CarInterfaceBase):
 
   # scc smoother - hyundai only
   def apply(self, c, controls):
-    can_sends = self.CC.update(c.enabled, self.CS, self.frame, c, c.actuators,
+    ret = self.CC.update(c.enabled, self.CS, self.frame, c, c.actuators,
                                c.cruiseControl.cancel, c.hudControl.visualAlert, c.hudControl.leftLaneVisible,
                                c.hudControl.rightLaneVisible, c.hudControl.leftLaneDepart, c.hudControl.rightLaneDepart,
                                c.hudControl.setSpeed, c.hudControl.leadVisible, controls)
     self.frame += 1
-    return can_sends
+    return ret
