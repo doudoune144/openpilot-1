@@ -507,9 +507,9 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.indi.actuatorEffectivenessV = [1.7, 1.3] #  Lowest value without oversteering. May vary with speed.
         
       ret.longitudinalTuning.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
-      ret.longitudinalTuning.kpV = [1.32, 1.25, 1.17, 0.98, 0.92, 0.87, 0.82]
+      ret.longitudinalTuning.kpV = [1.32, 1.25, 1.17, 0.98, 0.91, 0.85, 0.8]
       ret.longitudinalTuning.kiBP = [0.,80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
-      ret.longitudinalTuning.kiV = [0.08,0.06,0.05, 0.04]
+      ret.longitudinalTuning.kiV = [0.08,0.05,0.04, 0.03]
 
     elif candidate in [CAR.K7, CAR.K7_HEV]:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
