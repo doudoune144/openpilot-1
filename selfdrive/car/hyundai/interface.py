@@ -11,6 +11,7 @@ from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 from common.params import Params
 from selfdrive.car.disable_ecu import disable_ecu
+
 GearShifter = car.CarState.GearShifter
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
@@ -35,7 +36,7 @@ class CarInterface(CarInterfaceBase):
   def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[]):  # pylint: disable=dangerous-default-value
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
 
-    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool('DisableRadar')
+    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or Params().get_bool('RadarDisableEnabled') or Params().get_bool('DisableRadar')
     ret.radarDisable = Params().get_bool('DisableRadar')
     ret.radarDisableOld = Params().get_bool('RadarDisableEnabled')
     ret.radarDisablePossible = Params().get_bool('RadarDisableEnabled') or Params().get_bool('DisableRadar')
@@ -547,9 +548,6 @@ class CarInterface(CarInterfaceBase):
     ret.stoppingControl = True
 
     ret.enableBsm = 0x58b in fingerprint[0]
-
-    if ret.openpilotLongitudinalControl and Params().get_bool('DisableRadar'):
-      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
     ret.enableAutoHold = 1151 in fingerprint[0]
 
     # ignore CAN2 address if L-CAN on the same BUS

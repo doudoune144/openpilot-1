@@ -269,11 +269,6 @@ class DriverStatus():
         self.awareness = max(self.awareness - self.step_change, -0.1)
 
     alert = None
-    # override 
-    self.awareness = 1.
-    self.awareness_active = 1.
-    self.awareness_passive = 1.
-
     if self.awareness <= 0.:
       # terminal red alert: disengagement required
       alert = EventName.driverDistracted if self.active_monitoring_mode else EventName.driverUnresponsive

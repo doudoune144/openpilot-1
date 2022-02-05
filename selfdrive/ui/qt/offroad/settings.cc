@@ -758,6 +758,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             "../assets/offroad/icon_road.png",
                                             this));  
  
+   toggles.append(new ParamControl("RadarDisableEnabled",
+                                            "Community Radar Disable",
+                                            "Leagacy Cars ONLY! : openpilot will disable the car's radar and will take over control of gas and brakes. Warning: this disables AEB!",
+                                            "../assets/offroad/icon_road.png",
+                                            this));  
+ 
   toggles.append(new ParamControl("spasEnabled",
                                             "Enable SPAS.",
                                             "Enable Send Parking Assist Messages up to 38mph. Warning: It is beta, be careful!!",
@@ -776,12 +782,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             "../assets/offroad/icon_road.png",
                                             this));  
 
-  toggles.append(new ParamControl("NewRadarInterface",
+  /*toggles.append(new ParamControl("NewRadarInterface",
                                             "Use new radar interface",
                                             "",
                                             "../assets/offroad/icon_road.png",
                                             this));
-/*
+
   toggles.append(new ParamControl("DisableOpFcw",
                                             "Disable Openpilot FCW",
                                             "",
