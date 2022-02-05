@@ -356,14 +356,6 @@ class CarController():
         state = 2 if self.car_fingerprint in FEATURES["send_hda_state_2"] else 1
         can_sends.append(create_hda_mfc(self.packer, activated_hda, state))
 
-    # 5 Hz ACC options
-    if frame % 20 == 0 and CS.CP.radarDisable:
-      can_sends.extend(create_acc_opt(self.packer))
-
-    # 2 Hz front radar options
-    if frame % 50 == 0 and CS.CP.radarDisable:
-      can_sends.append(create_frt_radar_opt(self.packer))
-
 ############### SPAS STATES ############## JPR
 # State 1 : Start
 # State 2 : New Request
