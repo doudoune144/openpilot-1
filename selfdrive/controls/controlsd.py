@@ -32,9 +32,7 @@ from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_ge
 
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 20 * CV.MPH_TO_MS
-LANE_DEPARTURE_THRESHOLD = 0.1
-STEER_ANGLE_SATURATION_TIMEOUT = 1.0 / DT_CTRL
-STEER_ANGLE_SATURATION_THRESHOLD = 2.5  # Degrees
+LANE_DEPARTURE_THRESHOLD = 0.01
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -102,7 +100,6 @@ class Controls:
     # read params
     self.is_metric = params.get_bool("IsMetric")
     self.is_ldw_enabled = params.get_bool("IsLdwEnabled")
-    community_feature_toggle = params.get_bool("CommunityFeaturesToggle")
     openpilot_enabled_toggle = params.get_bool("OpenpilotEnabledToggle")
     passive = params.get_bool("Passive") or not openpilot_enabled_toggle
 
@@ -112,11 +109,7 @@ class Controls:
     car_recognized = self.CP.carName != 'mock'
 
     controller_available = self.CI.CC is not None and not passive and not self.CP.dashcamOnly
-    community_feature = self.CP.communityFeature or \
-                        self.CP.fingerprintSource == car.CarParams.FingerprintSource.can
-    community_feature_disallowed = community_feature and (not community_feature_toggle)
-    self.read_only = not car_recognized or not controller_available or \
-                       self.CP.dashcamOnly or community_feature_disallowed
+    self.read_only = not car_recognized or not controller_available or self.CP.dashcamOnly
     if self.read_only:
       safety_config = car.CarParams.SafetyConfig.new_message()
       safety_config.safetyModel = car.CarParams.SafetyModel.noOutput
@@ -135,13 +128,13 @@ class Controls:
     self.VM = VehicleModel(self.CP)
 
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
-      self.LaC = LatControlAngle(self.CP)
+      self.LaC = LatControlAngle(self.CP, self.CI)
     elif self.CP.lateralTuning.which() == 'pid':
       self.LaC = LatControlPID(self.CP, self.CI)
     elif self.CP.lateralTuning.which() == 'indi':
-      self.LaC = LatControlINDI(self.CP)
+      self.LaC = LatControlINDI(self.CP, self.CI)
     elif self.CP.lateralTuning.which() == 'lqr':
-      self.LaC = LatControlLQR(self.CP)
+      self.LaC = LatControlLQR(self.CP, self.CI)
 
     self.initialized = False
     self.state = State.disabled
@@ -155,7 +148,6 @@ class Controls:
     self.cruise_mismatch_counter = 0
     self.can_rcv_error_counter = 0
     self.last_blinker_frame = 0
-    self.saturated_count = 0
     self.distance_traveled = 0
     self.last_functional_fan_frame = 0
     self.events_prev = []
@@ -189,8 +181,6 @@ class Controls:
 
     if not sounds_available:
       self.events.add(EventName.soundsUnavailable, static=True)
-    if community_feature_disallowed and car_recognized and not self.CP.dashcamOnly:
-      self.events.add(EventName.communityFeatureDisallowed, static=True)
     if not car_recognized:
       self.events.add(EventName.carUnrecognized, static=True)
       if len(self.CP.carFw) > 0:
@@ -211,10 +201,8 @@ class Controls:
     """Compute carEvents from carState"""
 
     self.events.clear()
-    self.events.add_from_msg(CS.events)
-    self.events.add_from_msg(self.sm['driverMonitoringState'].events)
 
-    # Handle startup event
+    # Add startup event
     if self.startup_event is not None:
       if Params().get_bool('spasEnabled'):
         self.events.add(EventName.spasStartup)
@@ -226,6 +214,9 @@ class Controls:
     if not self.initialized:
       self.events.add(EventName.controlsInitializing)
       return
+
+    self.events.add_from_msg(CS.events)
+    self.events.add_from_msg(self.sm['driverMonitoringState'].events)
 
     # Create events for battery, temperature, disk space, and memory
     if EON and (self.sm['peripheralState'].pandaType != PandaType.uno) and \
@@ -285,9 +276,12 @@ class Controls:
     for i, pandaState in enumerate(self.sm['pandaStates']):
       # All pandas must match the list of safetyConfigs, and if outside this list, must be silent or noOutput
       if i < len(self.CP.safetyConfigs):
-        safety_mismatch = pandaState.safetyModel != self.CP.safetyConfigs[i].safetyModel or pandaState.safetyParam != self.CP.safetyConfigs[i].safetyParam
+        safety_mismatch = pandaState.safetyModel != self.CP.safetyConfigs[i].safetyModel or \
+                          pandaState.safetyParam != self.CP.safetyConfigs[i].safetyParam or \
+                          pandaState.unsafeMode != self.CP.unsafeMode
       else:
         safety_mismatch = pandaState.safetyModel not in IGNORED_SAFETY_MODES
+
       if safety_mismatch or self.mismatch_counter >= 200:
         self.events.add(EventName.controlsMismatch)
 
@@ -299,13 +293,13 @@ class Controls:
       self.events.add(EventName.radarFault)
     elif not self.sm.valid["pandaStates"]:
       self.events.add(EventName.usbError)
-    # elif not self.sm.all_alive_and_valid():
-    #   self.events.add(EventName.commIssue)
-    #   if not self.logged_comm_issue:
-    #     invalid = [s for s, valid in self.sm.valid.items() if not valid]
-    #     not_alive = [s for s, alive in self.sm.alive.items() if not alive]
-    #     cloudlog.event("commIssue", invalid=invalid, not_alive=not_alive)
-    #     self.logged_comm_issue = True
+    elif not self.sm.all_alive_and_valid() or self.can_rcv_error:
+      self.events.add(EventName.commIssue)
+      if not self.logged_comm_issue:
+        invalid = [s for s, valid in self.sm.valid.items() if not valid]
+        not_alive = [s for s, alive in self.sm.alive.items() if not alive]
+        cloudlog.event("commIssue", invalid=invalid, not_alive=not_alive, can_error=self.can_rcv_error, error=True)
+        self.logged_comm_issue = True
     else:
       self.logged_comm_issue = False
 
@@ -390,6 +384,10 @@ class Controls:
         if not self.read_only:
           self.CI.init(self.CP, self.can_sock, self.pm.sock['sendcan'])
         self.initialized = True
+
+        if REPLAY and self.sm['pandaStates'][0].controlsAllowed:
+          self.state = State.enabled
+
         Params().put_bool("ControlsReady", True)
 
     # Check for CAN timeout
@@ -423,10 +421,11 @@ class Controls:
     self.CP.pcmCruise = self.CI.CP.pcmCruise
 
     # if stock cruise is completely disabled, then we can use our own set speed logic
-    #if not self.CP.pcmCruise:
-    #  self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
-    #elif CS.cruiseState.enabled:
-    #  self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+    if self.CP.radarDisablePossible or self.CP.radarOffCan and self.CP.openpilotLongitudinalControl:
+      if not self.CP.pcmCruise:
+        self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
+      elif CS.cruiseState.enabled:
+        self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
 
     SccSmoother.update_cruise_buttons(self, CS, self.CP.openpilotLongitudinalControl)
 
@@ -461,7 +460,7 @@ class Controls:
             # no more soft disabling condition, so go back to ENABLED
             self.state = State.enabled
 
-          elif self.events.any(ET.SOFT_DISABLE) and self.soft_disable_timer > 0:
+          elif self.soft_disable_timer > 0:
             self.current_alert_types.append(ET.SOFT_DISABLE)
 
           elif self.soft_disable_timer <= 0:
@@ -566,19 +565,8 @@ class Controls:
         lac_log.output = steer
         lac_log.saturated = abs(steer) >= 0.9
 
-    # Check for difference between desired angle and angle for angle based control
-    angle_control_saturated = self.CP.steerControlType == car.CarParams.SteerControlType.angle and \
-      abs(actuators.steeringAngleDeg - CS.steeringAngleDeg) > STEER_ANGLE_SATURATION_THRESHOLD
-
-    if angle_control_saturated and not CS.steeringPressed and self.active:
-      self.saturated_count += 1
-    else:
-      self.saturated_count = 0
-
     # Send a "steering required alert" if saturation count has reached the limit
-    if (lac_log.saturated and not CS.steeringPressed) or \
-       (self.saturated_count > STEER_ANGLE_SATURATION_TIMEOUT):
-
+    if lac_log.active and lac_log.saturated and not CS.steeringPressed:
       dpath_points = lat_plan.dPathPoints
       if len(dpath_points):
         # Check if we deviated from the path
@@ -624,7 +612,7 @@ class Controls:
       CC.roll = orientation_value[0]
       CC.pitch = orientation_value[1]
 
-    CC.cruiseControl.cancel = self.CP.pcmCruise and not self.enabled and CS.cruiseState.enabled
+    CC.cruiseControl.cancel = CS.cruiseState.enabled and (not self.enabled or not self.CP.pcmCruise)
     if self.joystick_mode and self.sm.rcv_frame['testJoystick'] > 0 and self.sm['testJoystick'].buttons[0]:
       CC.cruiseControl.cancel = True
 

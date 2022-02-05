@@ -92,8 +92,8 @@ PairingPopup::PairingPopup(QWidget *parent) : QDialogBase(parent) {
     QLabel *instructions = new QLabel(R"(
       <ol type='1' style='margin-left: 15px;'>
         <li style='margin-bottom: 50px;'>Go to https://api.retropilot.org/useradmin/overview on your phone</li>
-        <li style='margin-bottom: 50px;'>Click "add new device" and scan the QR code on the right</li>
-        <li style='margin-bottom: 50px;'>Bookmark connect.comma.ai to your home screen to use it like an app</li>
+        <li style='margin-bottom: 50px;'>Click "Scan the QR code on the right</li>
+        <li style='margin-bottom: 50px;'>"Copy and paste the string into RetroPilot to register your device.</li>"</li>
       </ol>
     )", this);
     instructions->setStyleSheet("font-size: 47px; font-weight: bold; color: black;");
@@ -182,12 +182,12 @@ PrimeAdWidget::PrimeAdWidget(QWidget* parent) : QFrame(parent) {
   main_layout->setContentsMargins(80, 90, 80, 60);
   main_layout->setSpacing(0);
 
-  QLabel *upgrade = new QLabel("RetroPilot is Down.");
+  QLabel *upgrade = new QLabel("Upgrade Now");
   upgrade->setStyleSheet("font-size: 75px; font-weight: bold;");
   main_layout->addWidget(upgrade, 0, Qt::AlignTop);
   main_layout->addSpacing(50);
 
-  QLabel *description = new QLabel("If you are seeing this somethings not right!");
+  QLabel *description = new QLabel("Become a comma prime member at connect.comma.ai");
   description->setStyleSheet("font-size: 60px; font-weight: light; color: white;");
   description->setWordWrap(true);
   main_layout->addWidget(description, 0, Qt::AlignTop);
@@ -199,7 +199,7 @@ PrimeAdWidget::PrimeAdWidget(QWidget* parent) : QFrame(parent) {
   main_layout->addWidget(features, 0, Qt::AlignBottom);
   main_layout->addSpacing(30);
 
-  QVector<QString> bullets = {"Not Right", "RetroPilot", "Services Down"};
+  QVector<QString> bullets = {"Remote access", "14 days of storage", "Developer perks"};
   for (auto &b: bullets) {
     const QString check = "<b><font color='#465BEA'>✓</font></b> ";
     QLabel *l = new QLabel(check + b);

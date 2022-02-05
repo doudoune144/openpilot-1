@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import numpy as np
-
 from common.realtime import sec_since_boot
 from common.numpy_fast import clip, interp
 from selfdrive.swaglog import cloudlog
@@ -58,7 +57,7 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N+1) for idx in range(N
 T_IDXS = np.array(T_IDXS_LST)
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 MIN_ACCEL = -6.5
-T_FOLLOW = 1.4 # factor for linear distance increase. Dominant at steady distance. Recommendation 2s
+T_FOLLOW = 1.45 # factor for linear distance increase. Dominant at steady distance. Recommendation 2s
 COMFORT_BRAKE = 3. # inverse factor for quadratic distance increase. Dominant on speed diff
 STOP_DISTANCE = 4.5 # distance offset, minimum distance between cars when stopped
 
@@ -285,7 +284,7 @@ class LongitudinalMpc:
   def process_lead(self, lead):
     v_ego = self.x0[1]
     if lead is not None and lead.status:
-      x_lead = lead.dRel
+      x_lead = lead.dRel if lead.radar else max(lead.dRel - 1., 0.)
       v_lead = lead.vLead
       a_lead = lead.aLeadK
       a_lead_tau = lead.aLeadTau

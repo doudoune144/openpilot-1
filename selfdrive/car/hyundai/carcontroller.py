@@ -1,7 +1,5 @@
 from common.numpy_fast import clip, interp
 import numpy as np
-import time
-import os
 from random import randint
 from cereal import car
 from common.realtime import DT_CTRL
@@ -20,13 +18,14 @@ from selfdrive.road_speed_limiter import road_speed_limiter_get_active
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 min_set_speed = 30 * CV.KPH_TO_MS
-###### SPAS ######
+###### SPAS ###### - JPR
 STEER_ANG_MAX = 450 # SPAS Max Angle
 ANGLE_DELTA_BP = [0., 10., 20.]
 ANGLE_DELTA_V = [1.19, 1.14, 1.09]    # windup limit
 ANGLE_DELTA_VU = [1.29, 1.19, 1.14]   # unwind limit
 TQ = 290 # = TQ / 100 = NM is unit of measure for wheel.
 SPAS_SWITCH = 35 * CV.MPH_TO_MS #MPH - lowered Bc of model and overlearn steerRatio
+STEER_MAX_OFFSET = 50 # How far from MAX LKAS torque to engage Dynamic SPAS when under 60mph.
 ###### SPAS #######
 
 CLUSTER_ANIMATION_BP = [0., 1., 10., 20., 30., 40., 50.]
@@ -38,7 +37,7 @@ SP_CARS = (CAR.GENESIS, CAR.GENESIS_G70, CAR.GENESIS_G80,
 def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane,
                       left_lane_depart, right_lane_depart):
 
-  sys_warning = (visual_alert in (VisualAlert.steerRequired, VisualAlert.ldw))
+  sys_warning = (visual_alert in (VisualAlert.steerRequired, VisualAlert.ldw, VisualAlert.fcw))
 
   # initialize to no line visible
   sys_state = 1
@@ -67,22 +66,18 @@ class CarController():
     self.apply_steer_last = 0
     self.accel = 0
     self.lkas11_cnt = 0
-    self.scc12_cnt = -1
     self.counter_init = False
     self.radarDisableActivated = False
     self.radarDisableResetTimer = 0
     self.radarDisableOverlapTimer = 0
+    self.ACCMode = 0
 
     self.pcm_cnt = 0
-    self.resume_cnt = 0
-    self.last_lead_distance = 0
-    self.resume_wait_timer = 0
     self.last_resume_frame = 0
 
     self.turning_signal_timer = 0
     self.cut_timer = 0
     self.longcontrol = CP.openpilotLongitudinalControl
-    self.scc_live = not CP.radarOffCan 
 
     self.turning_indicator_alert = False
     self.emsType = CP.emsType
@@ -105,7 +100,6 @@ class CarController():
 
     param = Params()
 
-    self.mad_mode_enabled = param.get_bool('MadModeEnabled')
     self.ldws_opt = param.get_bool('IsLdwsCar')
     self.stock_navi_decel_enabled = param.get_bool('StockNaviDecelEnabled')
     self.keep_steering_turn_signals = param.get_bool('KeepSteeringTurnSignals')
@@ -115,8 +109,8 @@ class CarController():
     self.scc_smoother = SccSmoother()
     self.last_blinker_frame = 0
 
-  def update(self, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
-             left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
+  def update(self, c, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
+             left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls, hud_speed):
 
     # Steering Torque
     new_steer = int(round(actuators.steer * CarControllerParams.STEER_MAX))
@@ -129,13 +123,13 @@ class CarController():
     if CS.spas_enabled:
       apply_angle = clip(actuators.steeringAngleDeg, -1*(STEER_ANG_MAX), STEER_ANG_MAX)
       apply_diff = abs(apply_angle - CS.out.steeringAngleDeg)
-      if apply_diff > 1.8 and enabled: # Rate limit for when steering angle is not apply_angle - JPR
+      if apply_diff > 1.65 and enabled: # Rate limit for when steering angle is not apply_angle - JPR
         self.ratelimit = self.ratelimit + 0.03 # Increase each cycle - JPR
         rate_limit = max(self.ratelimit, 10) # Make sure not to go past +-10 on rate - JPR
         print("apply_diff is greater than 1.5 : rate limit :", rate_limit)
         apply_angle = clip(apply_angle, CS.out.steeringAngleDeg - rate_limit, CS.out.steeringAngleDeg + rate_limit)
       elif enabled:
-        self.ratelimit = 2.8 # Reset it back to 0.5 - JPR
+        self.ratelimit = 2.8 # Reset it back - JPR
         if self.last_apply_angle * apply_angle > 0. and abs(apply_angle) > abs(self.last_apply_angle):
           rate_limit = interp(CS.out.vEgo, ANGLE_DELTA_BP, ANGLE_DELTA_V)
         else:
@@ -143,7 +137,7 @@ class CarController():
         apply_angle = clip(apply_angle, self.last_apply_angle - rate_limit, self.last_apply_angle + rate_limit)
 
       self.last_apply_angle = apply_angle
-      spas_active = CS.spas_enabled and enabled and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 3.4 and CS.out.vEgo < 26.82 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active)
+      spas_active = CS.spas_enabled and enabled and CS.out.vEgo < 26.82 and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 3.2 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active or CarControllerParams.STEER_MAX - STEER_MAX_OFFSET < apply_steer and self.dynamicSpas)
       lkas_active = enabled and not self.low_speed_alert and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg and not CS.mdps11_stat == 5
     else:
       lkas_active = enabled and not self.low_speed_alert and abs(CS.out.steeringAngleDeg) < CS.CP.maxSteeringAngleDeg
@@ -152,21 +146,21 @@ class CarController():
       if Params().get_bool("SpasMode"):
         if abs(CS.out.steeringWheelTorque) > TQ  and self.DTQL > TQ and spas_active and not lkas_active:
           self.override = True
-          print("OVERRIDE")
+          #print("OVERRIDE")
         else:
           self.override = False
       else:
         if CS.out.steeringPressed:
             self.cut_timer = 0
-        if CS.out.steeringPressed or self.cut_timer <= 55: # Keep SPAS cut for 50 cycles after steering pressed to prevent unintentional fighting. - JPR
+        if CS.out.steeringPressed or self.cut_timer <= 65: # Keep SPAS cut for 50 cycles after steering pressed to prevent unintentional fighting. - JPR
           spas_active = False
           lkas_active = True
           self.cut_timer += 1
 
     # Disable steering while turning blinker on and speed below min lane chnage speed
-    if (CS.out.leftBlinker or CS.out.rightBlinker):
+    if (CS.out.leftBlinker or CS.out.rightBlinker) and not self.keep_steering_turn_signals and not self.NoMinLaneChangeSpeed:
       self.turning_signal_timer = 1.5 / DT_CTRL  # Disable for 1.5 Seconds after blinker turned off
-    if self.turning_indicator_alert and not self.keep_steering_turn_signals and not self.NoMinLaneChangeSpeed: # set and clear by interface...)
+    if self.turning_indicator_alert: # set and clear by interface...)
       lkas_active = False
       if CS.spas_enabled:
         spas_active = False
@@ -190,7 +184,6 @@ class CarController():
       if not recent_blinker and self.scc_smoother.over_speed_limit:
         left_lane_depart = True
         self.last_blinker_frame = controls.sm.frame
-
     sys_warning, sys_state, left_lane_warning, right_lane_warning = \
       process_hud_alert(enabled, self.car_fingerprint, visual_alert,
                         left_lane, right_lane, left_lane_depart, right_lane_depart)
@@ -206,21 +199,7 @@ class CarController():
 
     if frame == 0:  # initialize counts from last received count signals
       self.lkas11_cnt = CS.lkas11["CF_Lkas_MsgCount"]
-
-      # TODO: fix this
-      # self.prev_scc_cnt = CS.scc11["AliveCounterACC"]
-      # self.scc_update_frame = frame
-
-    # check if SCC is alive
-    # if frame % 7 == 0:
-    # if CS.scc11["AliveCounterACC"] == self.prev_scc_cnt:
-    # if frame - self.scc_update_frame > 20 and self.scc_live:
-    # self.scc_live = False
-    # else:
-    # self.scc_live = True
-    # self.prev_scc_cnt = CS.scc11["AliveCounterACC"]
-    # self.scc_update_frame = frame
-
+      
     self.prev_scc_cnt = CS.scc11["AliveCounterACC"]
 
     self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
@@ -244,7 +223,7 @@ class CarController():
     if frame % 2 and CS.mdps_bus: # send clu11 to mdps if it is not on bus 0
       can_sends.append(create_clu11(self.packer, frame // 2 % 0x10, CS.mdps_bus, CS.clu11, Buttons.NONE, enabled_speed))
 
-    if pcm_cancel_cmd and self.longcontrol and self.pcm_cnt == 0 and CS.out.cruiseState.enabled: #Make SCC cancel when op disengage or last accel is kept (IDK) -JPR
+    if pcm_cancel_cmd and self.longcontrol and self.pcm_cnt == 0 and CS.out.cruiseState.enabled and not CS.CP.radarDisablePossible: #Make SCC cancel when op disengage or last accel is kept (IDK) -JPR
       can_sends.append(create_clu11(self.packer, frame % 0x10, CS.scc_bus, CS.clu11, Buttons.CANCEL, clu11_speed))
       self.pcm_cnt += 1
     else:
@@ -321,51 +300,33 @@ class CarController():
     # scc smoother
     self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, controls)
 
-    if self.longcontrol and (CS.cruiseState_enabled and CS.scc_bus or CS.CP.radarDisablePossible or self.radarDisableActivated and self.counter_init):
+    if self.longcontrol and (CS.cruiseState_enabled and CS.scc_bus or CS.CP.radarDisablePossible or self.radarDisableActivated and self.counter_init or CS.CP.radarOffCan):
       if frame % 2 == 0:
         
         stopping = controls.LoC.long_control_state == LongCtrlState.stopping
-        apply_accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+        apply_accel = clip(actuators.accel if c.active else 0,
+                           CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
         apply_accel = self.scc_smoother.get_apply_accel(CS, controls.sm, apply_accel, stopping)
+
         self.accel = apply_accel
 
-        controls.apply_accel = apply_accel
-        aReqValue = CS.scc12["aReqValue"]
-        controls.aReqValue = aReqValue
+        set_speed_in_units = hud_speed * (CV.MS_TO_MPH if CS.clu11["CF_Clu_SPEED_UNIT"] == 1 else CV.MS_TO_KPH)
 
-        if aReqValue < controls.aReqValueMin:
-          controls.aReqValueMin = controls.aReqValue
-
-        if aReqValue > controls.aReqValueMax:
-          controls.aReqValueMax = controls.aReqValue
-
-        if self.stock_navi_decel_enabled:
-          controls.sccStockCamAct = CS.scc11["Navi_SCC_Camera_Act"]
-          controls.sccStockCamStatus = CS.scc11["Navi_SCC_Camera_Status"]
-          apply_accel, stock_cam = self.scc_smoother.get_stock_cam_accel(apply_accel, aReqValue, CS.scc11)
+        if enabled or CS.CP.radarDisablePossible:
+          self.ACCMode = 2 if CS.out.gasPressed else 1
         else:
-          controls.sccStockCamAct = 0
-          controls.sccStockCamStatus = 0
-          stock_cam = False
+          self.ACCMode = 0
 
-        if self.scc12_cnt < 0:
-          self.scc12_cnt = CS.scc12["CR_VSM_Alive"] if not CS.no_radar else 0
+        can_sends.append(create_scc12(self.packer, apply_accel, enabled, stopping, int(frame / 2), CS.out.gasPressed, self.ACCMode))
 
-        self.scc12_cnt += 1
-        self.scc12_cnt %= 0xF
-
-        can_sends.append(create_scc12(self.packer, apply_accel, enabled, CS.scc12,
-                                      CS.out.gasPressed, CS.out.brakePressed, CS.out.cruiseState.standstill, int(frame / 2)))
-
-        can_sends.append(create_scc11(self.packer, frame, enabled, set_speed, lead_visible, self.gapsetting, self.scc_live, CS.scc11, self.scc_smoother.active_cam, stock_cam, CS.out.standstill, CS.lead_distance))
+        can_sends.append(create_scc11(self.packer, enabled, set_speed_in_units, lead_visible, self.gapsetting, CS.lead_distance, int(frame / 2)))
 
         if frame % 20 == 0 and CS.has_scc13 and not CS.CP.radarDisablePossible:
           can_sends.append(create_scc13(self.packer, CS.scc13))
           
-        if CS.has_scc14:
-          acc_standstill = stopping if CS.out.vEgo < 2. else False
-
+        if CS.has_scc14 or CS.CP.radarDisablePossible or self.longcontrol and CS.CP.radarOffCan:
           lead = self.scc_smoother.get_lead(controls.sm)
+          jerk = clip(2.0 * (apply_accel - CS.out.aEgo), -12.7, 12.7)
 
           if lead is not None:
             d = lead.dRel
@@ -373,20 +334,24 @@ class CarController():
           else:
             obj_gap = 0
 
-          can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, acc_standstill, apply_accel, CS.out.gasPressed,
-                                        obj_gap, CS.scc14))
-          if CS.CP.radarDisablePossible:
-            can_sends.append(create_fca11(self.packer, int(frame / 2)))
+          can_sends.append(create_scc14(self.packer, enabled, CS.out.vEgo, apply_accel, CS.out.gasPressed,
+                                        obj_gap, jerk, stopping, self.ACCMode))
+        if CS.CP.radarDisablePossible:
+          can_sends.append(create_fca11(self.packer, int(frame / 2)))
     else:
-      self.scc12_cnt = -1
       self.counter_init = True
+      
+    if visual_alert in (VisualAlert.steerRequired, VisualAlert.ldw): # Hands on wheel alert - JPR
+      warning = 5
+    else:
+      warning = 0
 
     # 20 Hz LFA MFA message
     if frame % 5 == 0:
       activated_hda = road_speed_limiter_get_active()
       # activated_hda: 0 - off, 1 - main road, 2 - highway
       if self.car_fingerprint in FEATURES["send_lfa_mfa"]:
-        can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda))
+        can_sends.append(create_lfahda_mfc(self.packer, enabled, activated_hda, warning))
       elif CS.mdps_bus == 0:
         state = 2 if self.car_fingerprint in FEATURES["send_hda_state_2"] else 1
         can_sends.append(create_hda_mfc(self.packer, activated_hda, state))
@@ -476,16 +441,16 @@ class CarController():
       if (frame % 5) == 0:
         can_sends.append(create_spas12(CS.mdps_bus))
 
-      # 5 Hz ACC options
-      if frame % 20 == 0 and CS.CP.radarDisablePossible:
-        can_sends.extend(create_acc_opt(self.packer, int(frame / 2)))
-
-      # 2 Hz front radar options
-      if frame % 50 == 0 and CS.CP.radarDisablePossible:
-        can_sends.append(create_frt_radar_opt(self.packer))
-
       self.spas_active_last = spas_active
       self.DTQL = abs(CS.out.steeringWheelTorque)
+
+    # 5 Hz ACC options
+    if frame % 20 == 0 and CS.CP.radarDisablePossible:
+      can_sends.extend(create_acc_opt(self.packer, int(frame / 2)))
+
+    # 2 Hz front radar options
+    if frame % 50 == 0 and CS.CP.radarDisablePossible:
+      can_sends.append(create_frt_radar_opt(self.packer))
 
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / CarControllerParams.STEER_MAX

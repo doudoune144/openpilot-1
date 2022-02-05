@@ -41,7 +41,6 @@ def manager_init() -> None:
     ("CompletedTrainingVersion", "0"),
     ("HasAcceptedTerms", "0"),
     ("OpenpilotEnabledToggle", "1"),
-    ("CommunityFeaturesToggle", "1"),
     ("IsMetric", "1"),
 
     # HKG
@@ -82,7 +81,6 @@ def manager_init() -> None:
     ("DynamicSpas", "0"),
     ("SpasMode", "0"),
     ("SPASDebug", "0"),
-    ("CreepDebug", "0"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
@@ -166,8 +164,8 @@ def manager_thread() -> None:
 
   params = Params()
 
-  ignore = []
-  if params.get("DongleId", encoding='utf8') == UNREGISTERED_DONGLE_ID:
+  ignore: List[str] = []
+  if params.get("DongleId", encoding='utf8') in (None, UNREGISTERED_DONGLE_ID):
     ignore += ["manage_athenad", "uploader"]
   if os.getenv("NOBOARD") is not None:
     ignore.append("pandad")
@@ -261,6 +259,11 @@ if __name__ == "__main__":
   except Exception:
     add_file_handler(cloudlog)
     cloudlog.exception("Manager failed to start")
+
+    try:
+      managed_processes['ui'].stop()
+    except Exception:
+      pass
 
     # Show last 3 lines of traceback
     error = traceback.format_exc(-3)

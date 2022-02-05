@@ -60,12 +60,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "../assets/offroad/icon_metric.png",
     },
     {
-      "CommunityFeaturesToggle",
-      "Enable Community Features",
-      "Use features, such as community supported hardware, from the open source community that are not maintained or supported by comma.ai and have not been confirmed to meet the standard safety model. Be extra cautious when using these features",
-      "../assets/offroad/icon_shell.png",
-    },
-    {
       "RecordFront",
       "Record and Upload Driver Camera",
       "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
@@ -591,7 +585,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   main_layout = new QStackedLayout(this);
 
-  QWidget* homeScreen = new QWidget(this);
+  homeScreen = new QWidget(this);
   QVBoxLayout* vlayout = new QVBoxLayout(homeScreen);
   vlayout->setContentsMargins(0, 20, 0, 20);
 
@@ -657,7 +651,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             this));
 
   toggles.append(new ParamControl("SteerLockout",
-                                            "Enable Higher Than 90° Lateral Control for LKAS",
+                                            "Enable More Than 90° for LKAS",
                                             "This disables the max steer limit of 90°. SPAS does not apply to this. This will cause fault on certain cars that have a 90° limit on LKAS.",
                                             "../assets/offroad/icon_road.png",
                                             this));
@@ -699,25 +693,25 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             this));
 
   toggles.append(new ParamControl("NoMinLaneChangeSpeed",
-                                            "Enable Auto Lane Change at any speed.",
+                                            "Auto Lane Change At Any Speed",
                                             "warnings: it is beta, be careful!!",
                                             "../assets/offroad/icon_road.png",
                                             this));
 
   toggles.append(new ParamControl("KeepSteeringTurnSignals",
-                                            "Keep steering while turn signals.",
+                                            "Keep Steering While Turn Signals",
                                             "",
                                             "../assets/offroad/icon_openpilot.png",
                                             this));
 
-  toggles.append(new ParamControl("TurnSignals",
+  /*toggles.append(new ParamControl("TurnSignals",
                                             "Neokii or Crwusiz on screen blinkers.",
                                             "Your choice. No reboot required.",
                                             "../assets/offroad/icon_openpilot.png",
                                             this));
-
+*/
   toggles.append(new ParamControl("CustomLeadMark",
-                                            "Use custom lead mark",
+                                            "Use Custom Lead Mark",
                                             "",
                                             "../assets/offroad/icon_road.png",
                                             this));
@@ -729,13 +723,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             this));
 
   toggles.append(new ParamControl("SccSmootherSyncGasPressed",
-                                            "Sync set speed on gas pressed",
+                                            "Sync Set Speed On Gas Pressed",
                                             "",
                                             "../assets/offroad/icon_road.png",
                                             this));
 
   toggles.append(new ParamControl("StockNaviDecelEnabled",
-                                            "Stock Navi based deceleration",
+                                            "Stock Navi Based Deceleration",
                                             "Use the stock navi based deceleration for longcontrol",
                                             "../assets/offroad/icon_road.png",
                                             this));
@@ -746,14 +740,8 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             "../assets/offroad/icon_road.png",
                                             this));  
 
-  toggles.append(new ParamControl("KeepSteeringTurnSignals",
-                                            "Keep steering while turn signals",
-                                            "",
-                                            "../assets/offroad/icon_openpilot.png",
-                                            this));
-
   toggles.append(new ParamControl("WarningOverSpeedLimit",
-                                            "Warning when speeding",
+                                            "Warning When Speeding",
                                             "Warning when the current speed exceeds the speed limit.",
                                             "../assets/offroad/icon_openpilot.png",
                                             this));
@@ -777,13 +765,13 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             this));   
 
   toggles.append(new ParamControl("DynamicSpas",
-                                            "Enable Dynamic SPAS - LKAS switch - !ALPHA!",
+                                            "Dynamic SPAS/LKAS Switch - ALPHA",
                                             "Enable Send Parking Assist Messages depending on situation and factors. Will not switch to SPAS above 60mph; Will only hold SPAS above this speed if wheel is above an angle of |3|.  Warning: It is !ALPHA!, be careful!!",
                                             "../assets/offroad/icon_road.png",
                                             this));   
 
   toggles.append(new ParamControl("SpasMode",
-                                            "Switch to LKAS or Disengage on SPAS override",
+                                            "LKAS or Disengage on SPAS Override",
                                             "Switch to LKAS on Steering Pressed or Disengage on override torque. !ALPHA!",
                                             "../assets/offroad/icon_road.png",
                                             this));  
@@ -812,12 +800,6 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
                                             "This outputs OP SPAS State: (The state that op is calling MDPS to) and MDPS SPAS State: (The state MDPS is actually in)",
                                             "../assets/offroad/icon_road.png",
                                             this));
-  toggles.append(new ParamControl("CreepDebug",
-                                            "Enable Creep / Stopping State Debugging.",
-                                            "This outputs relevent information.",
-                                            "../assets/offroad/icon_road.png",
-                                            this));
-
 
   for(ParamControl *toggle : toggles) {
     if(main_layout->count() != 0) {

@@ -91,7 +91,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"CarParams", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"CarParamsCache", CLEAR_ON_MANAGER_START},
     {"CarVin", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
-    {"CommunityFeaturesToggle", PERSISTENT},
     {"CompletedTrainingVersion", PERSISTENT},
     {"ControlsReady", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"CurrentRoute", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
@@ -144,6 +143,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"NavdRender", PERSISTENT},
     {"OpenpilotEnabledToggle", PERSISTENT},
     {"PandaHeartbeatLost", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_OFF},
+    {"PandaSignatures", CLEAR_ON_MANAGER_START},
     {"Passive", PERSISTENT},
     {"PrimeRedirected", PERSISTENT},
     {"RecordFront", PERSISTENT},
@@ -216,7 +216,6 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"DynamicSpas", PERSISTENT},
     {"SpasMode", PERSISTENT},
     {"SPASDebug", PERSISTENT},
-    {"CreepDebug", PERSISTENT},
 };
 
 } // namespace
