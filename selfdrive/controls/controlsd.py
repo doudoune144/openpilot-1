@@ -294,6 +294,7 @@ class Controls:
     elif not self.sm.valid["pandaStates"]:
       self.events.add(EventName.usbError)
     elif not self.sm.all_alive_and_valid() or self.can_rcv_error:
+      self.logged_comm_issue = False
       # disable driver monitoring
       # self.events.add(EventName.commIssue)
       # if not self.logged_comm_issue:
