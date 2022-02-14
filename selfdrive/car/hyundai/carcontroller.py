@@ -25,7 +25,7 @@ ANGLE_DELTA_V = [1.19, 1.14, 1.09]    # windup limit
 ANGLE_DELTA_VU = [1.29, 1.19, 1.14]   # unwind limit
 TQ = 290 # = TQ / 100 = NM is unit of measure for wheel.
 SPAS_SWITCH = 30 * CV.MPH_TO_MS # MPH - lowered Bc of model and overlearn steerRatio
-STEER_MAX_OFFSET = 90 # How far from MAX LKAS torque to engage Dynamic SPAS when under 60mph.
+STEER_MAX_OFFSET = 95 # How far from MAX LKAS torque to engage Dynamic SPAS when under 60mph.
 ###### SPAS #######
 
 CLUSTER_ANIMATION_BP = [0., 1., 10., 20., 30., 40., 50.]
@@ -54,7 +54,6 @@ def process_hud_alert(enabled, fingerprint, visual_alert, left_lane, right_lane,
     right_lane_warning = 1
 
   return sys_warning, sys_state, left_lane_warning, right_lane_warning
-
 
 class CarController():
   def __init__(self, dbc_name, CP, VM):
@@ -257,7 +256,7 @@ class CarController():
       self.gapsetting = self.gapsettingdance
     else:
       d = CS.lead_distance
-      self.gapsettingdance = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4
+      self.gapsetting = 1 if d < 25 else 2 if d < 40 else 3 if d < 60 else 4
     # scc smoother
     self.scc_smoother.update(enabled, can_sends, self.packer, CC, CS, frame, controls)
 

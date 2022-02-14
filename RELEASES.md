@@ -1,5 +1,8 @@
 Version 0.8.13 (2022-XX-XX)
 ========================
+ * Added Toggle to tell Openpilot if you have enabled Radar Tracks with SSH script. - JPR
+ * Fix Gap and Driving Animation. - JPR
+ * Tune Dynamic SPAS. Very happy with performance! - JPR
  * Fixed HKG Longitudinal with Radar Disable (BOTH - HKG Long & Radar Disable Toggles ON!) - JPR
  * Improved driver monitoring
    * Retuned driver pose learner for relaxed driving positions
