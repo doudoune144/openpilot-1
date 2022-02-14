@@ -18,7 +18,7 @@ from common.params import Params
 LON_MPC_STEP = 0.2  # first step is 0.2s
 AWARENESS_DECEL = -0.2  # car smoothly decel at .2m/s^2 when user is distracted
 A_CRUISE_MIN = -1.2
-A_CRUISE_MAX_VALS = [1.5, 1.2, 0.8, 0.6]
+A_CRUISE_MAX_VALS = [1.7, 1.3, 0.8, 0.6]
 A_CRUISE_MAX_BP = [0., 15., 25., 40.]
 
 # Lookup table for turns
@@ -81,7 +81,7 @@ class Planner:
     prev_accel_constraint = True
     if long_control_state == LongCtrlState.off or sm['carState'].gasPressed:
       self.v_desired_filter.x = v_ego
-      self.a_desired = 0.0
+      self.a_desired = a_ego
       # Smoothly changing between accel trajectory is only relevant when OP is driving
       prev_accel_constraint = False
 

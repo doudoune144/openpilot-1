@@ -38,16 +38,16 @@ def manager_init() -> None:
   params.clear_all(ParamKeyType.CLEAR_ON_MANAGER_START)
 
   default_params: List[Tuple[str, Union[str, bytes]]] = [
-    ("CompletedTrainingVersion", "0"),
-    ("HasAcceptedTerms", "0"),
+    ("CompletedTrainingVersion", "1"),
+    ("HasAcceptedTerms", "1"),
     ("OpenpilotEnabledToggle", "1"),
     ("IsMetric", "1"),
 
     # HKG
     ("UseClusterSpeed", "0"),
-    ("LongControlEnabled", "0"),
+    ("LongControlEnabled", "1"),
     ("RadarDisableEnabled", "0"),
-    ("MadModeEnabled", "0"),
+    ("MadModeEnabled", "1"),
     ("IsLdwsCar", "0"),
     ("LaneChangeEnabled", "1"),
     ("AutoLaneChangeEnabled", "1"),
@@ -55,8 +55,8 @@ def manager_init() -> None:
     ("SccSmootherSlowOnCurves", "0"),
     ("SccSmootherSyncGasPressed", "0"),
     ("StockNaviDecelEnabled", "0"),
-    ("KeepSteeringTurnSignals", "0"),
-    ("NoMinLaneChangeSpeed", "0"),
+    ("KeepSteeringTurnSignals", "1"),
+    ("NoMinLaneChangeSpeed", "1"),
     ("TurnSignals", "0"),
     ("ShowDebugUI", "0"),
     ("UseSMDPSHarness", "0"),
@@ -70,9 +70,9 @@ def manager_init() -> None:
     ("TPMS_Alerts", "1"),
     ("PutPrebuilt", "0"),
     ("StockNaviDecelEnabled", "0"),
-    ("WarningOverSpeedLimit", "0"),
     ("CustomLeadMark", "0"),
     ("HyundaiNaviSL", "0"),
+    ("HapticFeedbackWhenSpeedCamera", "0"),
     ("DisableOpFcw", "1"),
     ("NewRadarInterface", "0"),
     ("LowSpeedAlerts", "1"),
