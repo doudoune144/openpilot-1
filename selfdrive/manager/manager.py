@@ -46,7 +46,6 @@ def manager_init() -> None:
     # HKG
     ("UseClusterSpeed", "0"),
     ("LongControlEnabled", "1"),
-    ("RadarDisableEnabled", "0"),
     ("MadModeEnabled", "1"),
     ("IsLdwsCar", "0"),
     ("LaneChangeEnabled", "1"),
