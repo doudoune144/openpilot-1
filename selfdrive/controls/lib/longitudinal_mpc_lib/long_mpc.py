@@ -59,7 +59,7 @@ T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 MIN_ACCEL = -6.5
 T_FOLLOW = 1.45 # factor for linear distance increase. Dominant at steady distance. Recommendation 2s
 COMFORT_BRAKE = 3. # inverse factor for quadratic distance increase. Dominant on speed diff
-STOP_DISTANCE = 4.5 # distance offset, minimum distance between cars when stopped
+STOP_DISTANCE = 6. # distance offset, minimum distance between cars when stopped
 
 def get_stopped_equivalence_factor(v_lead):
   return (v_lead**2) / (2 * COMFORT_BRAKE)
