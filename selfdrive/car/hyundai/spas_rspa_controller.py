@@ -29,6 +29,7 @@ class SpasRspaController:
     self.ratelimit = 2.3 # Starting point - JPR
     self.rate = 0
     self.lastSteeringAngleDeg = 0
+    self.cut_timer = 0
 
   def update(self, c, enabled, CS, actuators, frame, maxTQ, packer, car_fingerprint, emsType, apply_steer, turnsignalcut):
     self.packer = packer
