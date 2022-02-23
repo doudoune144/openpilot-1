@@ -19,6 +19,7 @@ STEER_MAX_OFFSET = 105 # How far from MAX LKAS torque to engage Dynamic SPAS whe
 
 class SpasRspaController:
   def __init__(self):
+    spas_active = False
     self.last_apply_angle = 0.0
     self.en_spas = 2
     self.mdps11_stat_last = 0
