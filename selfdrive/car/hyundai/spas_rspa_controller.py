@@ -19,7 +19,6 @@ STEER_MAX_OFFSET = 105 # How far from MAX LKAS torque to engage Dynamic SPAS whe
 
 class SpasRspaController:
   def __init__(self):
-    spas_active = False
     self.last_apply_angle = 0.0
     self.en_spas = 2
     self.mdps11_stat_last = 0
@@ -55,7 +54,7 @@ class SpasRspaController:
         apply_angle = clip(apply_angle, self.last_apply_angle - rate_limit, self.last_apply_angle + rate_limit)
 
       self.last_apply_angle = apply_angle
-      spas_active = CS.spas_enabled and c.active and CS.out.vEgo < 26.82 and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 3.2 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active or maxTQ - STEER_MAX_OFFSET < apply_steer and self.dynamicSpas)
+    spas_active = CS.spas_enabled and c.active and CS.out.vEgo < 26.82 and (CS.out.vEgo < SPAS_SWITCH or apply_diff > 3.2 and self.dynamicSpas and not CS.out.steeringPressed or abs(apply_angle) > 3. and self.spas_active or maxTQ - STEER_MAX_OFFSET < apply_steer and self.dynamicSpas)
 
     if CS.spas_enabled and enabled:
       if CS.out.steeringPressed:
