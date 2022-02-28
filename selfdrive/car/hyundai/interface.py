@@ -27,7 +27,7 @@ class CarInterface(CarInterfaceBase):
     v_current_kph = current_speed * CV.MS_TO_KPH
 
     gas_max_bp = [0., 10., 20., 50., 70., 130.]
-    gas_max_v = [CarControllerParams.ACCEL_MAX, 2., 1.8, 1.5, 1., 0.55, 0.33]
+    gas_max_v = [CarControllerParams.ACCEL_MAX, 2., 1.8, 1.5, 1., 0.48, 0.30]
 
     return CarControllerParams.ACCEL_MIN, interp(v_current_kph, gas_max_bp, gas_max_v)
 
@@ -691,17 +691,13 @@ class CarInterface(CarInterfaceBase):
     if self.mad_mode_enabled and EventName.pedalPressed in events.events:
       events.events.remove(EventName.pedalPressed)
 
-    if Params().get_bool('spasEnabled'):
-      if self.CS.mdps11_stat == 7 and not self.CC.turning_indicator_alert:
-        if self.CS.mdps11_stat == 7 and self.CC.mdps11_stat_last == 7 and not self.CC.lkas_active and self.CC.spas_active: # We need to alert driver when SPAS abort or fail.
-          events.add(EventName.steerSaturated) 
-
-      if self.CS.mdps11_stat == 6 or self.CS.mdps11_stat == 8:
-        events.add(EventName.steerTempUnavailable)
-
     # scc smoother
     if self.CC.scc_smoother is not None:
       self.CC.scc_smoother.inject_events(events)
+
+    # SPAS and RSPA controller - JPR
+    if self.CC.scc_smoother is not None:
+      self.CC.spas_rspa_controller.inject_events(events)
 
     ret.events = events.to_msg()
 

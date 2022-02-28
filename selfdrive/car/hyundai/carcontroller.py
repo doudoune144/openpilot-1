@@ -82,7 +82,6 @@ class CarController():
     self.prev_active_cam = False
     self.active_cam_timer = 0
     
-
   def update(self, c, enabled, CS, frame, CC, actuators, pcm_cancel_cmd, visual_alert,
              left_lane, right_lane, left_lane_depart, right_lane_depart, set_speed, lead_visible, controls):
 
@@ -116,8 +115,10 @@ class CarController():
 
     self.apply_steer_last = apply_steer
 
+    can_sends = []
+
     # SPAS and RSPA controller - JPR
-    self.spas_rspa_controller.update(c, enabled, CS, actuators, frame, CarControllerParams.STEER_MAX, self.packer, self.car_fingerprint, self.emsType, apply_steer, self.turning_indicator_alert)
+    self.spas_rspa_controller.update(c, enabled, CS, actuators, frame, CarControllerParams.STEER_MAX, self.packer, self.car_fingerprint, self.emsType, apply_steer, self.turning_indicator_alert, can_sends)
 
     sys_warning, sys_state, left_lane_warning, right_lane_warning = \
       process_hud_alert(enabled, self.car_fingerprint, visual_alert,
@@ -148,8 +149,6 @@ class CarController():
     self.prev_scc_cnt = CS.scc11["AliveCounterACC"]
 
     self.lkas11_cnt = (self.lkas11_cnt + 1) % 0x10
-
-    can_sends = []
 
     # tester present - w/ no response (keeps radar disabled)
     if CS.CP.radarDisable:
@@ -256,4 +255,5 @@ class CarController():
     new_actuators = actuators.copy()
     new_actuators.steer = apply_steer / CarControllerParams.STEER_MAX
     new_actuators.accel = self.accel
+      
     return new_actuators, can_sends
