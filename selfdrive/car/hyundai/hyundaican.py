@@ -124,7 +124,7 @@ def create_mdps12(packer, frame, mdps12):
 
   return packer.make_can_msg("MDPS12", 2, values)
 
-def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_speed, stopping, gapsetting, gaspressed, radarDisable):
+def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, lead_dist, set_speed, stopping, gapsetting, gaspressed, radarDisable, scc14):
   commands = []
 
   scc11_values = {
@@ -149,18 +149,18 @@ def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_spe
   }
   scc12_dat = packer.make_can_msg("SCC12", 0, scc12_values)[2]
   scc12_values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
-
   commands.append(packer.make_can_msg("SCC12", 0, scc12_values))
 
-  scc14_values = {
-    "ComfortBandUpper": 0.0, # stock usually is 0 but sometimes uses higher values
-    "ComfortBandLower": 0.0, # stock usually is 0 but sometimes uses higher values
-    "JerkUpperLimit": max(jerk, 1.0) if (enabled and not stopping) else 0, # stock usually is 1.0 but sometimes uses higher values
-    "JerkLowerLimit": max(-jerk, 1.0) if enabled else 0, # stock usually is 0.5 but sometimes uses higher values
-    "ACCMode": 2 if enabled and gaspressed else 1 if enabled else 4, # stock will always be 4 instead of 0 after first disengage
-    "ObjGap": 2 if lead_visible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
-  }
-  commands.append(packer.make_can_msg("SCC14", 0, scc14_values))
+  if scc14 or radarDisable:
+    scc14_values = {
+      "ComfortBandUpper": 0.0, # stock usually is 0 but sometimes uses higher values
+      "ComfortBandLower": 0.0, # stock usually is 0 but sometimes uses higher values
+      "JerkUpperLimit": max(jerk, 1.0) if (enabled and not stopping) else 0, # stock usually is 1.0 but sometimes uses higher values
+      "JerkLowerLimit": max(-jerk, 1.0) if enabled else 0, # stock usually is 0.5 but sometimes uses higher values
+      "ACCMode": 2 if enabled and gaspressed else 1 if enabled else 4, # stock will always be 4 instead of 0 after first disengage
+      "ObjGap": 0 if not lead_visible else 1 if lead_dist < 25 else 2 if lead_dist < 40 else 3 if lead_dist < 60 else 4 if lead_dist < 80 else 5, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
+    }
+    commands.append(packer.make_can_msg("SCC14", 0, scc14_values))
   if radarDisable:
     fca11_values = {
       # seems to count 2,1,0,3,2,1,0,3,2,1,0,3,2,1,0,repeat...
@@ -188,11 +188,12 @@ def create_acc_opt(packer, radarDisable):
   }
   commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
-  fca12_values = {
-    "FCA_DrvSetState": 2,
-    "FCA_USM": 1 if radarDisable else 0, # AEB disabled
-  }
-  commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
+  if radarDisable:
+    fca12_values = {
+      "FCA_DrvSetState": 2,
+      "FCA_USM": 1, # AEB disabled
+    }
+    commands.append(packer.make_can_msg("FCA12", 0, fca12_values))
 
   return commands
 
@@ -201,44 +202,3 @@ def create_frt_radar_opt(packer):
     "CF_FCA_Equip_Front_Radar": 1,
   }
   return packer.make_can_msg("FRT_RADAR11", 0, frt_radar11_values)
-
-def create_spas11(packer, car_fingerprint, frame, en_spas, apply_steer, bus):
-  values = {
-    "CF_Spas_Stat": en_spas,
-    "CF_Spas_TestMode": 0,
-    "CR_Spas_StrAngCmd": apply_steer,
-    "CF_Spas_BeepAlarm": 0,
-    "CF_Spas_Mode_Seq": 2,
-    "CF_Spas_AliveCnt": frame % 0x200,
-    "CF_Spas_Chksum": 0,
-    "CF_Spas_PasVol": 0,
-  }
-  dat = packer.make_can_msg("SPAS11", 0, values)[2]
-  if car_fingerprint in CHECKSUM["crc8"]:
-    dat = dat[:6]
-    values["CF_Spas_Chksum"] = hyundai_checksum(dat)
-  else:
-    values["CF_Spas_Chksum"] = sum(dat[:6]) % 256
-  return packer.make_can_msg("SPAS11", bus, values)
-
-def create_spas12(bus):
-  return [1268, 0, b"\x00\x00\x00\x00\x00\x00\x00\x00", bus]
-  
-def create_ems_366(packer, ems_366, enabled):
-  values = ems_366
-  if enabled:
-    values["VS"] = 1
-  return packer.make_can_msg("EMS_366", 1, values)
-
-def create_ems11(packer, ems11, enabled):
-  values = ems11
-  if enabled:
-    values["VS"] = 1
-  return packer.make_can_msg("EMS11", 1, values)
-
-def create_eems11(packer, eems11, enabled):
-  values = eems11
-  if enabled:
-    values["Accel_Pedal_Pos"] = 1
-    values["CR_Vcu_AccPedDep_Pos"] = 1
-  return packer.make_can_msg("E_EMS11", 1, values)

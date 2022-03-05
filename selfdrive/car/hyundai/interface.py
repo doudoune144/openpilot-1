@@ -11,6 +11,7 @@ from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
 from common.params import Params
 from selfdrive.car.disable_ecu import disable_ecu
 
+
 GearShifter = car.CarState.GearShifter
 EventName = car.CarEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
@@ -39,11 +40,7 @@ class CarInterface(CarInterfaceBase):
     ret.radarDisable = Params().get_bool('DisableRadar')
 
     ret.carName = "hyundai"
-    # these cars require a special panda safety mode due to missing counters and checksums in the messages
-    #if candidate in LEGACY_SAFETY_MODE_CAR:
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiLegacy, 0)]
-    #else:
-    #  ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundai, 0)]
 
     tire_stiffness_factor = 1.
     if Params().get_bool('SteerLockout'):
@@ -67,8 +64,8 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.lqr.l = [0.33, 0.318]
 
     ret.steerRatio = 16.5
-    ret.steerActuatorDelay = 0.1
-    ret.steerRateCost = 0.4
+    ret.steerActuatorDelay = 0.15
+    ret.steerRateCost = 0.35
 
     ret.steerLimitTimer = 2.5
     ret.steerMaxBP = [0.]
@@ -97,9 +94,10 @@ class CarInterface(CarInterfaceBase):
 	
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
+    
     ret.stoppingDecelRate = 0.72  # brake_travel/s while trying to stop
-    ret.vEgoStopping = 0.9
-    ret.vEgoStarting = 0.9  # needs to be >= vEgoStopping to avoid state transition oscillation
+    ret.vEgoStopping = 1.0
+    ret.vEgoStarting = 1.0  # needs to be >= vEgoStopping to avoid state transition oscillation
 
     # genesis
     if candidate == CAR.GENESIS:
@@ -368,7 +366,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 13.73  # Spec
       ret.wheelbase = 2.7
       tire_stiffness_factor = 0.385
-      ret.emsType = 3
+      ret.emsType = 4
       if candidate not in [CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV] and not Params().get_bool('UseSMDPSHarness'):
         ret.minSteerSpeed = 32 * CV.MPH_TO_MS
       ret.centerToFront = ret.wheelbase * 0.4
@@ -422,11 +420,11 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.7
     elif candidate == CAR.STINGER:
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Stinger.png img_spinner_comma.png")
-      tire_stiffness_factor = 1.0
-      ret.mass = 1640.0 + STD_CARGO_KG
-      ret.wheelbase = 2.84
-      ret.steerRatio = 14.44 
+      tire_stiffness_factor = 1.125 # LiveParameters (Tunder's 2020)
+      ret.mass = 1825.0 + STD_CARGO_KG
+      ret.wheelbase = 2.906
       ret.centerToFront = ret.wheelbase * 0.4
+      ret.steerRatio = 14.4 * 1.15   # 15% higher at the center seems reasonable - before was 14.44 
       ret.emsType = 1 
 
       if not UseLQR:
@@ -563,14 +561,17 @@ class CarInterface(CarInterfaceBase):
     ret.radarOffCan = ret.sccBus == -1
     ret.pcmCruise = not ret.radarOffCan or not ret.radarDisable
 
-    if ret.openpilotLongitudinalControl and (ret.radarDisable or ret.radarOffCan):
+    if ret.radarDisable or ret.openpilotLongitudinalControl and ret.radarOffCan:
       ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HYUNDAI_LONG
-    
-    # SPAS
-    ret.spasEnabled = Params().get_bool('spasEnabled')
+      
+    # SPAS - JPR
+    ret.spasEnabled = Params().get_bool('SpasRspaEnabled')
+
+    # RSPA - JPR
+    ret.rspaEnabled = False # ret.spasEnabled and not candidate in LEGACY_SAFETY_MODE_CAR
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
-    if ret.radarOffCan or ret.radarDisable or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled') or Params().get_bool('spasEnabled'):
+    if ret.radarOffCan or ret.radarDisable or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or ret.sccBus == 1 or Params().get_bool('MadModeEnabled') or ret.spasEnabled:
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
     return ret
   

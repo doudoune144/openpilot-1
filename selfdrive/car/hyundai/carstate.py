@@ -8,7 +8,6 @@ from common.params import Params
 
 GearShifter = car.CarState.GearShifter
 
-
 class CarState(CarStateBase):
   def __init__(self, CP):
     super().__init__(CP)
@@ -52,6 +51,7 @@ class CarState(CarStateBase):
     self.use_cluster_speed = Params().get_bool('UseClusterSpeed')
     self.long_control_enabled = Params().get_bool('LongControlEnabled')
     self.spas_enabled = CP.spasEnabled
+    self.rspa_enabled = CP.rspaEnabled
     self.mdps11_stat = 0
 
   def update(self, cp, cp2, cp_cam):
@@ -71,8 +71,7 @@ class CarState(CarStateBase):
 
     ret.seatbeltUnlatched = cp.vl["CGW1"]["CF_Gway_DrvSeatBeltSw"] == 0
 
-    self.is_set_speed_in_mph = bool(cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"])
-    self.speed_conv_to_ms = CV.MPH_TO_MS if self.is_set_speed_in_mph else CV.KPH_TO_MS
+    self.speed_conv_to_ms = CV.MPH_TO_MS if cp.vl["CLU11"]["CF_Clu_SPEED_UNIT"] == 1 else CV.KPH_TO_MS
 
     cluSpeed = cp.vl["CLU11"]["CF_Clu_Vanz"]
     decimal = cp.vl["CLU11"]["CF_Clu_VanzDecimal"]
@@ -117,7 +116,8 @@ class CarState(CarStateBase):
     ret.steeringTorqueEps = cp_mdps.vl["MDPS12"]['CR_Mdps_OutTq'] / 10
     ret.steeringWheelTorque = cp_mdps.vl["MDPS11"]['CR_Mdps_DrvTq'] 
 
-    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD + 150 if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.steeringPressedSPAS = abs(ret.steeringTorque) > STEER_THRESHOLD + 155 if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
 
     if not ret.standstill and cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
       self.mdps_error_cnt += 1
@@ -223,8 +223,10 @@ class CarState(CarStateBase):
       self.scc13 = cp_scc.vl["SCC13"]
     if self.has_scc14:
       self.scc14 = cp_scc.vl["SCC14"]
+    
+    #if self.rspa_enabled: # RSPA - JPR
 
-    if self.spas_enabled: # SPAS
+    if self.spas_enabled: # SPAS - JPR
       self.ems_366 = cp.vl["EMS_366"]
       self.ems11 = cp.vl["EMS11"]
       self.eems11 = cp.vl["E_EMS11"]
@@ -535,6 +537,11 @@ class CarState(CarStateBase):
       ]
       checks += [("ESP11", 50)]
     if CP.spasEnabled:
+      signals += [
+        ("CR_Mdps_StrAng", "MDPS11", 0),
+        ("CF_Mdps_Stat", "MDPS11", 0),
+        ]
+      checks += [("MDPS11", 100)]      
       if CP.mdpsBus == 1:
         if CP.emsType == 1:
           signals += [
@@ -573,12 +580,7 @@ class CarState(CarStateBase):
             ("CR_Vcu_AccPedDep_Pos", "E_EMS11", 0),
           ]
           checks += [("E_EMS11", 100)]
-        elif CP.mdpsBus == 0:
-          signals += [
-            ("CR_Mdps_StrAng", "MDPS11", 0),
-            ("CF_Mdps_Stat", "MDPS11", 0),
-          ]
-          checks += [("MDPS11", 100)]
+
     if Params().get_bool("HyundaiNaviSL"):
       signals += [
         ("SpeedLim_Nav_Clu", "Navi_HU", 0),
