@@ -477,7 +477,7 @@ class CarInterface(CarInterfaceBase):
       os.system("cd /data/openpilot/selfdrive/assets && rm -rf img_spinner_comma.png && cp Kia.png img_spinner_comma.png")
       ret.mass = 1850. + STD_CARGO_KG # 265 hp version
       ret.wheelbase = 2.7
-      ret.steerRatio = 13.73 *1.15 # 15% increase from spec
+      ret.steerRatio = 13.3 *1. # 0% increase from spec
       tire_stiffness_factor = 0.7
       ret.centerToFront = ret.wheelbase * 0.4
       ret.emsType = 3
