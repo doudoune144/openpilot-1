@@ -481,6 +481,7 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.7
       ret.centerToFront = ret.wheelbase * 0.4
       ret.emsType = 3
+      ret.steerRateCost = 0.1 # mpc steer cost  stock 0.35
       
       if not UseLQR:
         ret.lateralTuning.init('indi')
