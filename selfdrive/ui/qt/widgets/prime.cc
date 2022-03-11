@@ -90,9 +90,9 @@ PairingPopup::PairingPopup(QWidget *parent) : QDialogBase(parent) {
 
     QLabel *instructions = new QLabel(R"(
       <ol type='1' style='margin-left: 15px;'>
-        <li style='margin-bottom: 50px;'>Go to https://connect.comma.ai on your phone</li>
+        <li style='margin-bottom: 50px;'>Go to https://api.retropilot.org/ on your phone</li>
         <li style='margin-bottom: 50px;'>Click "add new device" and scan the QR code on the right</li>
-        <li style='margin-bottom: 50px;'>Bookmark connect.comma.ai to your home screen to use it like an app</li>
+        <li style='margin-bottom: 50px;'>Bookmark retropilot to your home screen to use it like an app</li>
       </ol>
     )", this);
     instructions->setStyleSheet("font-size: 47px; font-weight: bold; color: black;");
@@ -120,7 +120,7 @@ PrimeUserWidget::PrimeUserWidget(QWidget* parent) : QWidget(parent) {
   primeLayout->setMargin(0);
   primeWidget->setContentsMargins(60, 50, 60, 50);
 
-  QLabel* subscribed = new QLabel("✓ SUBSCRIBED");
+  QLabel* subscribed = new QLabel("✓ Retropilot");
   subscribed->setStyleSheet("font-size: 41px; font-weight: bold; color: #86FF4E;");
   primeLayout->addWidget(subscribed, 0, Qt::AlignTop);
 
@@ -132,7 +132,7 @@ PrimeUserWidget::PrimeUserWidget(QWidget* parent) : QWidget(parent) {
 
   primeLayout->addSpacing(20);
 
-  QLabel* connectUrl = new QLabel("CONNECT.COMMA.AI");
+  QLabel* connectUrl = new QLabel("retropilot again");
   connectUrl->setStyleSheet("font-size: 41px; font-family: Inter SemiBold; color: #A0A0A0;");
   primeLayout->addWidget(connectUrl, 0, Qt::AlignTop);
 
@@ -186,7 +186,7 @@ PrimeAdWidget::PrimeAdWidget(QWidget* parent) : QFrame(parent) {
   main_layout->addWidget(upgrade, 0, Qt::AlignTop);
   main_layout->addSpacing(50);
 
-  QLabel *description = new QLabel("Become a comma prime member at connect.comma.ai");
+  QLabel *description = new QLabel("Connect to retropilot");
   description->setStyleSheet("font-size: 60px; font-weight: light; color: white;");
   description->setWordWrap(true);
   main_layout->addWidget(description, 0, Qt::AlignTop);
@@ -233,7 +233,7 @@ SetupWidget::SetupWidget(QWidget* parent) : QFrame(parent) {
 
   finishRegistationLayout->addSpacing(30);
 
-  QLabel* registrationDescription = new QLabel("Pair your device with comma connect (connect.comma.ai) and claim your comma prime offer.");
+  QLabel* registrationDescription = new QLabel("Pair your device with retropilot");
   registrationDescription->setWordWrap(true);
   registrationDescription->setStyleSheet("font-size: 55px; font-weight: light; margin-left: 55px;");
   finishRegistationLayout->addWidget(registrationDescription);
