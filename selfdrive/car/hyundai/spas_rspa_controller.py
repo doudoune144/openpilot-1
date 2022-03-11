@@ -1,15 +1,16 @@
-# This is the work of JPR
+# This is the work of JPR. "I love the Korean Cars!"
+import copy
 from cereal import car
 from common.params import Params
 from common.numpy_fast import clip, interp
 from selfdrive.config import Conversions as CV
 from common.realtime import DT_CTRL
-from selfdrive.car.hyundai.values import CAR, CHECKSUM, FEATURES, EV_HYBRID_CAR
+from selfdrive.car.hyundai.values import CHECKSUM, LEGACY_SAFETY_MODE_CAR
 import crcmod
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 ###### SPAS ###### - JPR
-STEER_ANG_MAX = 450 # SPAS Max Angle
+STEER_ANG_MAX = 360 # SPAS Max Angle
 ANGLE_DELTA_BP = [0., 10., 20.]
 ANGLE_DELTA_V = [1.19, 1.14, 1.09]    # windup limit
 ANGLE_DELTA_VU = [1.29, 1.19, 1.14]   # unwind limit
@@ -34,6 +35,7 @@ class SpasRspaController:
     self.cut_timer = 0
     self.SteeringTempUnavailable = False
     self.ens_rspa = 0
+    self.spas_mode_sequence = 2 if LEGACY_SAFETY_MODE_CAR else 1
   
   @staticmethod
   def create_rspa11(packer, frame, en_rspa, bus, enabled, setspeed, stopping, gaspressed):
@@ -55,13 +57,13 @@ class SpasRspaController:
     values["CF_RSPA_CRC"] = hyundai_checksum(dat)
     return packer.make_can_msg("RSPA11", bus, values)
 
-  def create_spas11(packer, car_fingerprint, frame, en_spas, apply_steer, bus):
+  def create_spas11(packer, car_fingerprint, frame, en_spas, apply_steer, bus, spas_mode_sequence):
     values = {
       "CF_Spas_Stat": en_spas,
       "CF_Spas_TestMode": 0, # Maybe if set to 1 will ignore VS... needs testing.
       "CR_Spas_StrAngCmd": apply_steer,
       "CF_Spas_BeepAlarm": 0,
-      "CF_Spas_Mode_Seq": 2,
+      "CF_Spas_Mode_Seq": spas_mode_sequence, # 2 if LEGACY_SAFETY_MODE_CAR else 1,
       "CF_Spas_AliveCnt": frame % 0x200, 
       "CF_Spas_Chksum": 0,
       "CF_Spas_PasVol": 0,
@@ -74,7 +76,7 @@ class SpasRspaController:
       values["CF_Spas_Chksum"] = sum(dat[:6]) % 256
     return packer.make_can_msg("SPAS11", bus, values)
 
-  def create_spas12(packer, bus):
+  def create_spas12(packer, bus): # SPAS Screen Prompts. - JPR
     values = {
     "CF_Spas_HMI_Stat": 0,
     "CF_Spas_Disp": 0,
@@ -100,30 +102,39 @@ class SpasRspaController:
     "CF_Spas_RCS_Alarm": 0,
     "CF_Spas_RRS_Alarm": 0,
     }
-    return packer.make_can_msg("SPAS12", bus, values)
-    #return [1268, 0, b"\x00\x00\x00\x00\x00\x00\x00\x00", bus]
+    #return packer.make_can_msg("SPAS12", bus, values) # When we want to do somthing with the SPAS prompts. - JPR
+    return [1268, 0, b"\x00\x00\x00\x00\x00\x00\x00\x00", bus]
   
   def create_ems_366(packer, ems_366, enabled):
-    values = ems_366
+    values = copy.copy(ems_366)
     if enabled:
       values["VS"] = 1
     return packer.make_can_msg("EMS_366", 1, values)
 
   def create_ems11(packer, ems11, enabled):
-    values = ems11
+    values = copy.copy(ems11)
     if enabled:
       values["VS"] = 1
     return packer.make_can_msg("EMS11", 1, values)
 
   def create_eems11(packer, eems11, enabled):
-    values = eems11
+    #values = copy.copy(eems11)
     if enabled:
-      values["Accel_Pedal_Pos"] = 1
-      values["CR_Vcu_AccPedDep_Pos"] = 1
+      #values["Accel_Pedal_Pos"] = 1
+      #values["CR_Vcu_AccPedDep_Pos"] = 1
+      values = {
+        "Brake_Pedal_Pos": 0,
+        "IG_Reactive_Stat": 0,
+        "Gear_Change": 0,
+        "Cruise_Limit_Status": 0,
+        "Cruise_Limit_Target": 0,
+        "Accel_Pedal_Pos": 0,
+        "CR_Vcu_AccPedDep_Pos": 0,
+      }
     return packer.make_can_msg("E_EMS11", 1, values)
 
   def create_clu11(packer, clu11, enabled):
-    values = clu11
+    values = copy.copy(clu11)
     if enabled:
       values["CF_Clu_Vanz"] = 1
     return packer.make_can_msg("CLU11", 1, values)
@@ -134,7 +145,7 @@ class SpasRspaController:
 
   def RSPA_Controller(self, c, CS, frame, packer, can_sends, set_speed, stopping):
     if CS.rspa_enabled:
-      if (frame % 2) == 0: # Not sure rough guess for now... Will know when see cabana. - JPR
+      if (frame % 1) == 0: # RSPA11 at 100hz. - JPR
         can_sends.append(SpasRspaController.create_rspa11(packer, frame, self.en_rspa, CS.mdps_bus, c.active, set_speed, stopping, CS.out.gasPressed))
 
   def SPAS_Controller(self, c, CS, actuators, frame, maxTQ, packer, car_fingerprint, emsType, apply_steer, turnsignalcut, can_sends):
@@ -162,19 +173,16 @@ class SpasRspaController:
         else:
           apply_angle = CS.mdps11_strang
 
-      if (CS.out.steeringPressedSPAS or self.rate > 1.4): # Reset SPAS cut timer if steeringPressedSPAS is True or if the steering wheel is moving fast. - JPR
+      if (CS.out.steeringPressedSPAS or self.rate > 1.2): # Reset SPAS cut timer if steeringPressedSPAS is True or if the steering wheel is moving with intent. - JPR
         self.cut_timer = 0
+        spas_active = False
         
-      if CS.out.steeringPressedSPAS or self.cut_timer <= 85:# Keep SPAS cut for 50 cycles after steering pressed to prevent unintentional fighting. - JPR
+      if CS.out.steeringPressedSPAS or self.cut_timer <= 100:# Keep SPAS cut for 80 cycles after steering pressed to prevent unintentional fighting. - JPR
         spas_active = False
         self.cut_timer += 1
     
       if turnsignalcut:
         spas_active = False
-
-      if CS.out.steeringPressedSPAS or self.cut_timer < 85 and self.rate > 5:# Keep SPAS cut for 50 cycles after steering pressed to prevent unintentional fighting. - JPR
-        spas_active = False
-        self.cut_timer += 1
 
       self.last_apply_angle = apply_angle
 
@@ -205,10 +213,10 @@ class SpasRspaController:
         can_sends.append(SpasRspaController.create_eems11(self.packer, CS.eems11, spas_active_stat))
         if Params().get_bool('SPASDebug'):
           print("E_EMS11")
-      elif emsType == 4:
-        can_sends.append(SpasRspaController.create_clu11(self.packer, CS.clu11, spas_active_stat))
-        if Params().get_bool('SPASDebug'):
-          print("CLU11")
+      #elif emsType == 4:
+        #can_sends.append(SpasRspaController.create_clu11(self.packer, CS.clu11, spas_active_stat))
+        #if Params().get_bool('SPASDebug'):
+          #print("CLU11")
       #elif emsType == 0:
         #print("Please add a car parameter called ret.emsType = (your EMS type) in interface.py : EMS_366 = 1 : EMS_11 = 2 : E_EMS11 = 3")
 
@@ -244,11 +252,11 @@ class SpasRspaController:
           self.SteeringTempUnavailable = False
 
         if not spas_active:
-          apply_angle = CS.mdps11_strang
+          apply_angle = CS.mdps11_strang if self.spas_mode_sequence == 2 else CS.sas11_angle
 
-        can_sends.append(SpasRspaController.create_spas11(self.packer, self.car_fingerprint, (frame // 2), self.en_spas, apply_angle, CS.mdps_bus))
+        can_sends.append(SpasRspaController.create_spas11(self.packer, self.car_fingerprint, (frame // 2), self.en_spas, apply_angle, CS.mdps_bus, self.spas_mode_sequence))
       
-      SpasRspaController.screen_controller(CS, can_sends, frame) # Access SPAS12 message controller for screen Prompts. - JPR
+      SpasRspaController.screen_controller(self, CS, can_sends, frame) # Access SPAS12 message controller for screen Prompts. - JPR
       
       if Params().get_bool('SPASDebug'): # SPAS debugging - JPR
         print("MDPS SPAS State: ", CS.mdps11_stat) # SPAS STATE DEBUG
@@ -264,11 +272,37 @@ class SpasRspaController:
   def screen_controller(self, CS, can_sends, frame):
     # SPAS12 20Hz
       if (frame % 5) == 0:
-        can_sends.append(SpasRspaController.create_spas12(CS.mdps_bus))
+        can_sends.append(SpasRspaController.create_spas12(self.packer, CS.mdps_bus))
 
-  #def park_assist_system(self): ultrasonic radar sensors PAS 
+  #def park_assist_system(self): ultrasonic radar sensors PAS. Will continue when I get bumper and PAS fixed. LOL
 
-  #def search_for_spot(self):
+  #def distance_traveled(self, CS):
+  #  self.VS = CS.out.vEgo # M/s
+  #  self.time = 1 / DT_CTRL # Time
+  #  if self.rising_edge == 1:
+  #    self.time_passed = 1 / DT_CTRL # Time Passed
+  #    self.distance_traveled = self.time_passed * self.VS
+  #  else:
+  #    self.time_passed = 0
+
+
+  #def search_for_spot(self, CS):
+  #  self.pas_fr_dif = self.pas_fr - self.pas_fr_last
+  #  if CS.out.rightBlinker: # Search Right Side
+  #    if self.pas_fr_dif > 2: # Edge detection 
+  #      if self.falling_edge == 0: # which came first?
+  #        self.rising_edge = 1
+  #      elif self.falling_edge == 1:
+  #        self.rising_edge = 2
+  #    elif self.pas_fr_dif > -2: # Edge detection
+  #      if self.rising_edge == 0: # which came first? 
+  #        self.falling_edge = 1
+  #      elif self.rising_edge == 1:
+  #        self.falling_edge = 2
+
+    #elif CS.out.leftBlinker: # Search Left Side
+      #if self.pas_fl >:
+
 
   #def perpedicular_park(self):
 

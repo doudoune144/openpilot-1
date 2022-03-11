@@ -1,10 +1,11 @@
 from cereal import car
-from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, CAR, HYBRID_CAR, EV_HYBRID_CAR
+from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, CAR, HYBRID_CAR, EV_HYBRID_CAR, LEGACY_SAFETY_MODE_CAR
 from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
 from selfdrive.config import Conversions as CV
 from common.params import Params
+from common.numpy_fast import interp, clip
 
 GearShifter = car.CarState.GearShifter
 
@@ -50,9 +51,15 @@ class CarState(CarStateBase):
 
     self.use_cluster_speed = Params().get_bool('UseClusterSpeed')
     self.long_control_enabled = Params().get_bool('LongControlEnabled')
+
     self.spas_enabled = CP.spasEnabled
     self.rspa_enabled = CP.rspaEnabled
     self.mdps11_stat = 0
+    self.spas_mode_sequence = 2 if LEGACY_SAFETY_MODE_CAR else 1
+
+    # Wheel Momentum/Rate Factor. - JPR
+    self.angle_delta_bp = [0., 5., 10., 20., 30, 40, 50, 60, 70] # How Fast is SAS11 is reporting the rate in deg. - JPR
+    self.angle_delta_v = [1., 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45]  # How much the rate factor should be. - JPR
 
   def update(self, cp, cp2, cp_cam):
     cp_mdps = cp2 if self.mdps_bus else cp
@@ -65,6 +72,9 @@ class CarState(CarStateBase):
     self.prev_right_blinker = self.rightBlinker
     self.prev_lkas_button = self.lkas_button_on
     ret = car.CarState.new_message()
+
+    if self.spas_enabled:
+      RATE_FACTOR = clip(interp(abs(cp_sas.vl["SAS11"]['SAS_Speed']), self.angle_delta_bp, self.angle_delta_v), 1.0, 1.45) # Don't Let angle factor get above 1.45! - JPR
 
     ret.doorOpen = any([cp.vl["CGW1"]["CF_Gway_DrvDrSw"], cp.vl["CGW1"]["CF_Gway_AstDrSw"],
                         cp.vl["CGW2"]["CF_Gway_RLDrSw"], cp.vl["CGW2"]["CF_Gway_RRDrSw"]])
@@ -117,7 +127,9 @@ class CarState(CarStateBase):
     ret.steeringWheelTorque = cp_mdps.vl["MDPS11"]['CR_Mdps_DrvTq'] 
 
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
-    ret.steeringPressedSPAS = abs(ret.steeringTorque) > STEER_THRESHOLD + 155 if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.steeringPressedSPAS = abs(ret.steeringTorque) > STEER_THRESHOLD + (205 * RATE_FACTOR) if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
+    if Params().get_bool('SPASDebug'):
+      print("Rate Factor  : ", RATE_FACTOR)
 
     if not ret.standstill and cp_mdps.vl["MDPS12"]["CF_Mdps_ToiUnavail"] != 0:
       self.mdps_error_cnt += 1
@@ -230,7 +242,10 @@ class CarState(CarStateBase):
       self.ems_366 = cp.vl["EMS_366"]
       self.ems11 = cp.vl["EMS11"]
       self.eems11 = cp.vl["E_EMS11"]
-      self.mdps11_strang = cp_mdps.vl["MDPS11"]["CR_Mdps_StrAng"]
+      if self.spas_mode_sequence == 1:
+        self.sas11_angle = cp_mdps.vl["SAS11"]["SAS_Angle"]
+      elif self.spas_mode_sequence == 2:
+        self.mdps11_strang = cp_mdps.vl["MDPS11"]["CR_Mdps_StrAng"]
       self.mdps11_stat_last = self.mdps11_stat
       self.mdps11_stat = cp_mdps.vl["MDPS11"]["CF_Mdps_Stat"]
       ret.mdps11Stat = cp_mdps.vl["MDPS11"]["CF_Mdps_Stat"]
@@ -458,6 +473,52 @@ class CarState(CarStateBase):
         ("MDPS12", 50),
         ("MDPS11", 100),
       ]
+      if CP.spasEnabled:
+        signals += [
+          ("CR_Mdps_StrAng", "MDPS11", 0),
+          ("CF_Mdps_Stat", "MDPS11", 0),
+        ]
+        checks += [("MDPS11", 100)]
+    elif CP.mdpsBus == 1: # If MDPS bus is 1 do this for bus 0. I.E. Going to spoof! - JPR
+      if CP.spasEnabled:        
+        if CP.emsType == 1:
+          signals += [
+            ("TQI_1", "EMS_366", 0),
+            ("N", "EMS_366", 0),
+            ("TQI_2", "EMS_366", 0),
+            ("VS", "EMS_366", 0),
+            ("SWI_IGK", "EMS_366", 0),
+          ]
+          checks += [("EMS_366", 100)]
+        elif CP.emsType == 2:
+          signals += [
+            ("SWI_IGK", "EMS11", 0),
+            ("F_N_ENG", "EMS11", 0),
+            ("ACK_TCS", "EMS11", 0),
+            ("PUC_STAT", "EMS11", 0),
+            ("TQ_COR_STAT", "EMS11", 0),
+            ("RLY_AC", "EMS11", 0),
+            ("F_SUB_TQI", "EMS11", 0),
+            ("TQI_ACOR", "EMS11", 0),
+            ("N", "EMS11", 0),
+            ("TQI", "EMS11", 0),
+            ("TQFR", "EMS11", 0),
+            ("VS", "EMS11", 0),
+            ("RATIO_TQI_BAS_MAX_STND", "EMS11", 0),
+          ]
+          checks += [("EMS11", 100)]
+        elif CP.emsType == 3:
+          signals += [
+            ("Brake_Pedal_Pos", "E_EMS11", 0),
+            ("IG_Reactive_Stat", "E_EMS11", 0),
+            ("Gear_Change", "E_EMS11", 0),
+            ("Cruise_Limit_Status", "E_EMS11", 0),
+            ("Cruise_Limit_Target", "E_EMS11", 0),
+            ("Accel_Pedal_Pos", "E_EMS11", 0),
+            ("CR_Vcu_AccPedDep_Pos", "E_EMS11", 0),
+          ]
+          checks += [("E_EMS11", 100)]
+
     if CP.sasBus == 0:
       signals += [
         ("SAS_Angle", "SAS11"),
@@ -536,50 +597,6 @@ class CarState(CarStateBase):
         ("LDM_STAT", "ESP11"),
       ]
       checks += [("ESP11", 50)]
-    if CP.spasEnabled:
-      signals += [
-        ("CR_Mdps_StrAng", "MDPS11", 0),
-        ("CF_Mdps_Stat", "MDPS11", 0),
-        ]
-      checks += [("MDPS11", 100)]      
-      if CP.mdpsBus == 1:
-        if CP.emsType == 1:
-          signals += [
-            ("TQI_1", "EMS_366", 0),
-            ("N", "EMS_366", 0),
-            ("TQI_2", "EMS_366", 0),
-            ("VS", "EMS_366", 0),
-            ("SWI_IGK", "EMS_366", 0),
-          ]
-          checks += [("EMS_366", 100)]
-        elif CP.emsType == 2:
-          signals += [
-            ("SWI_IGK", "EMS11", 0),
-            ("F_N_ENG", "EMS11", 0),
-            ("ACK_TCS", "EMS11", 0),
-            ("PUC_STAT", "EMS11", 0),
-            ("TQ_COR_STAT", "EMS11", 0),
-            ("RLY_AC", "EMS11", 0),
-            ("F_SUB_TQI", "EMS11", 0),
-            ("TQI_ACOR", "EMS11", 0),
-            ("N", "EMS11", 0),
-            ("TQI", "EMS11", 0),
-            ("TQFR", "EMS11", 0),
-            ("VS", "EMS11", 0),
-            ("RATIO_TQI_BAS_MAX_STND", "EMS11", 0),
-          ]
-          checks += [("EMS11", 100)]
-        elif CP.emsType == 3:
-          signals += [
-            ("Brake_Pedal_Pos", "E_EMS11", 0),
-            ("IG_Reactive_Stat", "E_EMS11", 0),
-            ("Gear_Change", "E_EMS11", 0),
-            ("Cruise_Limit_Status", "E_EMS11", 0),
-            ("Cruise_Limit_Target", "E_EMS11", 0),
-            ("Accel_Pedal_Pos", "E_EMS11", 0),
-            ("CR_Vcu_AccPedDep_Pos", "E_EMS11", 0),
-          ]
-          checks += [("E_EMS11", 100)]
 
     if Params().get_bool("HyundaiNaviSL"):
       signals += [
@@ -596,6 +613,11 @@ class CarState(CarStateBase):
     signals = []
     checks = []
     if CP.mdpsBus == 1:
+      if CP.spasEnabled: # Need Check this and get signal from bus 1 if MDPS on bus 1. - JPR
+        signals += [
+          ("CR_Mdps_StrAng", "MDPS11", 0),
+          ("CF_Mdps_Stat", "MDPS11", 0),
+        ]
       signals += [
         ("CR_Mdps_StrColTq", "MDPS12", 0),
         ("CF_Mdps_Def", "MDPS12", 0),
@@ -614,14 +636,7 @@ class CarState(CarStateBase):
         ("MDPS12", 50),
         ("MDPS11", 100),
       ]
-      if CP.spasEnabled:
-        signals += [
-          ("CR_Mdps_StrAng", "MDPS11", 0),
-          ("CF_Mdps_Stat", "MDPS11", 0),
-        ]
-        checks += [
-          ("MDPS11", 100),
-        ]
+
     if CP.sasBus == 1:
       signals += [
         ("SAS_Angle", "SAS11"),
@@ -630,6 +645,7 @@ class CarState(CarStateBase):
       checks += [
         ("SAS11", 100)
       ]
+
     if CP.sccBus == 1:
       signals += [
         ("MainMode_ACC", "SCC11"),
@@ -715,6 +731,8 @@ class CarState(CarStateBase):
     checks = [
       ("LKAS11", 100)
     ]
+
+
     if CP.sccBus == 2:
       signals += [
         ("MainMode_ACC", "SCC11"),

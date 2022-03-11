@@ -4,7 +4,7 @@ from cereal import car
 from panda import Panda
 from common.numpy_fast import interp
 from selfdrive.config import Conversions as CV
-from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams, LEGACY_SAFETY_MODE_CAR
+from selfdrive.car.hyundai.values import CAR, Buttons, CarControllerParams
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
@@ -342,7 +342,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 13.73  # Spec
       tire_stiffness_factor = 0.7
       ret.centerToFront = ret.wheelbase * 0.4
-      ret.emsType = 3
+      ret.emsType = 2
       if not UseLQR:
         ret.lateralTuning.init('indi')
         ret.lateralTuning.indi.innerLoopGainBP = [0.]
@@ -366,7 +366,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 13.73  # Spec
       ret.wheelbase = 2.7
       tire_stiffness_factor = 0.385
-      ret.emsType = 4
+      ret.emsType = 2
       if candidate not in [CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV] and not Params().get_bool('UseSMDPSHarness'):
         ret.minSteerSpeed = 32 * CV.MPH_TO_MS
       ret.centerToFront = ret.wheelbase * 0.4
@@ -469,7 +469,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.7
       ret.steerRatio = 13.73  # Spec
       tire_stiffness_factor = 0.7
-      ret.emsType = 3
+      ret.emsType = 2
       ret.centerToFront = ret.wheelbase * 0.4
       if candidate == CAR.NIRO_HEV and not Params().get_bool('UseSMDPSHarness'):
         ret.minSteerSpeed = 32 * CV.MPH_TO_MS
