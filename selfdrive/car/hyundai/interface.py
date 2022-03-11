@@ -34,8 +34,8 @@ class CarInterface(CarInterfaceBase):
     ret.pcmCruiseSpeed = False if (Params().get_bool("SpeedLimitControl") or Params().get_bool("TurnVisionControl") or Params().get_bool("TurnSpeedControl")) else True
 
     ret.steerActuatorDelay = 0.1  # Default delay
-    ret.steerRateCost = 0.5
-    ret.steerLimitTimer = 0.4
+    ret.steerRateCost = 0.35
+    ret.steerLimitTimer = 2.5
     tire_stiffness_factor = 1.
 
     ret.stoppingControl = True
@@ -46,7 +46,7 @@ class CarInterface(CarInterfaceBase):
     ret.stopAccel = 0.0
     ret.startAccel = 0.0
 
-    ret.longitudinalActuatorDelayUpperBound = 1.0 # s
+    ret.longitudinalActuatorDelayUpperBound = 0.3 # s
 
     if candidate in [CAR.SANTA_FE, CAR.SANTA_FE_2022, CAR.SANTA_FE_HEV_2022]:
       ret.lateralTuning.pid.kf = 0.00005
@@ -156,7 +156,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 14.4 * 1.1   # 10% higher at the center seems reasonable
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.25], [0.05]]
-    elif candidate in [CAR.KIA_NIRO_EV, CAR.KIA_NIRO_HEV, CAR.KIA_NIRO_HEV_2021]:
+    elif candidate in [CAR.KIA_NIRO_HEV, CAR.KIA_NIRO_HEV_2021]:
       ret.lateralTuning.pid.kf = 0.00006
       ret.mass = 1737. + STD_CARGO_KG
       ret.wheelbase = 2.7
@@ -166,6 +166,25 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.25], [0.05]]
       if candidate == CAR.KIA_NIRO_HEV:
         ret.minSteerSpeed = 32 * CV.MPH_TO_MS
+    elif candidate == CAR.KIA_NIRO_EV:
+      ret.mass = 1850. + STD_CARGO_KG
+      ret.wheelbase = 2.7
+      ret.steerRatio = 13.3
+      ret.steerRateCost = 0.2 # mpc steer cost  stock 0.35
+      tire_stiffness_factor = 0.7
+      ret.lateralTuning.init('indi')
+      ret.lateralTuning.indi.innerLoopGainBP = [0., 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS]
+      ret.lateralTuning.indi.innerLoopGainV = [3., 4.5, 5.] # third tune. Highest value that still gives smooth control. Affects turning into curves.
+      ret.lateralTuning.indi.outerLoopGainBP = [0., 60.*CV.KPH_TO_MS]
+      ret.lateralTuning.indi.outerLoopGainV = [2, 3.8] # forth tune. Highest value that still gives smooth control. Affects lane centering.
+      ret.lateralTuning.indi.timeConstantBP = [0.]
+      ret.lateralTuning.indi.timeConstantV = [1.2] # second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
+      ret.lateralTuning.indi.actuatorEffectivenessBP = [0.,60.*CV.KPH_TO_MS]
+      ret.lateralTuning.indi.actuatorEffectivenessV = [1.4, 1.4] #  Lowest value without oversteering. May vary with speed.   
+      ret.longitudinalTuning.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
+      ret.longitudinalTuning.kpV = [0.3, 0.7, 1.37, 1.18, 1.11, 1.05, 1]
+      ret.longitudinalTuning.kiBP = [0., 20.* CV.KPH_TO_MS, 80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
+      ret.longitudinalTuning.kiV = [0.01, 0.05, 0.05, 0.04, 0.03]
     elif candidate == CAR.KIA_SELTOS:
       ret.mass = 1337. + STD_CARGO_KG
       ret.wheelbase = 2.63
