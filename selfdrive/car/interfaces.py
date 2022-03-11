@@ -20,7 +20,7 @@ EventName = car.CarEvent.EventName
 #MAX_CTRL_SPEED = (V_CRUISE_MAX + 4) * CV.KPH_TO_MS  # 144 + 4 = 92 mph
 MAX_CTRL_SPEED = 161 * CV.KPH_TO_MS  # 144 + 4 = 92 mph
 ACCEL_MAX = 2.0
-ACCEL_MIN = -4.0
+ACCEL_MIN = -6.5
 
 
 # generic car and radar interfaces

@@ -53,15 +53,15 @@ class CarInterface(CarInterfaceBase):
     # Most Hyundai car ports are community features for now
     ret.pcmCruise = not ret.radarOffCan
 
-    ret.steerActuatorDelay = 0.25  # Default delay
-    ret.steerRateCost = 0.35
+    ret.steerActuatorDelay = 0.1 # stock 0.25  # Default delay
+    ret.steerRateCost = 0.2 # stock 0.35
     ret.steerLimitTimer = 0.8
-    tire_stiffness_factor = 1.
+    tire_stiffness_factor = 0.7
 
-    ret.longitudinalTuning.kpBP = [0., 4., 9., 17., 23., 31.]
-    ret.longitudinalTuning.kpV = [1.2, 1.1, 1.0, 0.9, 0.75, 0.65]
-    ret.longitudinalTuning.kiBP = [0., 4., 9., 17., 23., 31.]
-    ret.longitudinalTuning.kiV = [0.27, 0.24, 0.23, 0.2, 0.17, 0.15]
+    ret.longitudinalTuning.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpV = [0.3, 0.7, 1.37, 1.18, 1.11, 1.05, 1]
+    ret.longitudinalTuning.kiBP = [0., 20.* CV.KPH_TO_MS, 80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
+    ret.longitudinalTuning.kiV = [0.01, 0.05, 0.05, 0.04, 0.03]
 
     ret.longitudinalTuning.deadzoneBP = [0., 4.]
     ret.longitudinalTuning.deadzoneV = [0., 0.1]
@@ -115,10 +115,10 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.pid.kdV = [PidKd]
     elif lat_control_method == 1:
       ret.lateralTuning.init('indi')
-      ret.lateralTuning.indi.innerLoopGainBP = [0.]
-      ret.lateralTuning.indi.innerLoopGainV = [InnerLoopGain] # third tune. Highest value that still gives smooth control. Effects turning into curves.
-      ret.lateralTuning.indi.outerLoopGainBP = [0.]
-      ret.lateralTuning.indi.outerLoopGainV = [OuterLoopGain] # forth tune. Highest value that still gives smooth control. Effects lane centering.
+      ret.lateralTuning.indi.innerLoopGainBP = [0., 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS]
+      ret.lateralTuning.indi.innerLoopGainV = [InnerLoopGain, InnerLoopGain*1.5, InnerLoopGain*1.65] # third tune. Highest value that still gives smooth control. Effects turning into curves.
+      ret.lateralTuning.indi.outerLoopGainBP = [0., 60.*CV.KPH_TO_MS]
+      ret.lateralTuning.indi.outerLoopGainV = [OuterLoopGain, OuterLoopGain*1.9] # forth tune. Highest value that still gives smooth control. Effects lane centering.
       ret.lateralTuning.indi.timeConstantBP = [0.]
       ret.lateralTuning.indi.timeConstantV = [TimeConstant] # second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
       ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
@@ -230,7 +230,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1985. + STD_CARGO_KG
       ret.wheelbase = 2.78
     elif candidate in (CAR.NIRO_HEV, CAR.NIRO_EV):
-      ret.mass = 1737. + STD_CARGO_KG
+      ret.mass = 1850. + STD_CARGO_KG
       ret.wheelbase = 2.7
     elif candidate in (CAR.K7, CAR.K7_HEV):
       ret.mass = 1680. + STD_CARGO_KG
