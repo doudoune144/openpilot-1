@@ -5,20 +5,25 @@ from common.numpy_fast import interp
 from common.realtime import DT_MDL
 from selfdrive.hardware import EON, TICI
 from selfdrive.swaglog import cloudlog
+from common.params import Params
 
 
 TRAJECTORY_SIZE = 33
-# camera offset is meters from center car to camera
-if EON:
-  CAMERA_OFFSET = 0.06
-  PATH_OFFSET = 0.0
-elif TICI:
-  CAMERA_OFFSET = -0.04
-  PATH_OFFSET = -0.04
-else:
-  CAMERA_OFFSET = 0.0
-  PATH_OFFSET = 0.0
 
+# camera offset is meters from center car to camera
+# Get offset from param file
+params = Params()
+CameraOffset = float(params.get("CameraOffset", encoding='utf8'))
+
+if EON:
+  CAMERA_OFFSET = 0.06 + CameraOffset / 100
+  PATH_OFFSET = 0.0 + CameraOffset / 100
+elif TICI:
+  CAMERA_OFFSET = -0.04 + CameraOffset / 100
+  PATH_OFFSET = -0.04 + CameraOffset / 100
+else:
+  CAMERA_OFFSET = 0.0 + CameraOffset / 100
+  PATH_OFFSET = 0.0 + CameraOffset / 100
 
 class LanePlanner:
   def __init__(self, wide_camera=False):

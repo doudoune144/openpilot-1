@@ -20,6 +20,7 @@ UNREGISTERED_DONGLE_ID = "UnregisteredDevice"
 def register(show_spinner=False) -> str:
   params = Params()
   params.put("SubscriberInfo", HARDWARE.get_subscriber_info())
+  params.put("CameraOffset", "0")
 
   IMEI = params.get("IMEI", encoding='utf8')
   HardwareSerial = params.get("HardwareSerial", encoding='utf8')
