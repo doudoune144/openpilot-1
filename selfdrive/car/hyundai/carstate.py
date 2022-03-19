@@ -1,9 +1,9 @@
 from cereal import car
-from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, CAR, HYBRID_CAR, EV_HYBRID_CAR, LEGACY_SAFETY_MODE_CAR
+from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, CAR, HYBRID_CAR, EV_HYBRID_CAR
 from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.config import Conversions as CV
+from common.conversions import Conversions as CV
 from common.params import Params
 from common.numpy_fast import interp, clip
 
@@ -55,7 +55,6 @@ class CarState(CarStateBase):
     self.spas_enabled = CP.spasEnabled
     self.rspa_enabled = CP.rspaEnabled
     self.mdps11_stat = 0
-    self.spas_mode_sequence = 2 if LEGACY_SAFETY_MODE_CAR else 1
 
     # Wheel Momentum/Rate Factor. - JPR
     self.angle_delta_bp = [0., 5., 10., 20., 30, 40, 50, 60, 70] # How Fast is SAS11 is reporting the rate in deg. - JPR
@@ -127,7 +126,7 @@ class CarState(CarStateBase):
     ret.steeringWheelTorque = cp_mdps.vl["MDPS11"]['CR_Mdps_DrvTq'] 
 
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
-    ret.steeringPressedSPAS = abs(ret.steeringTorque) > STEER_THRESHOLD + (205 * RATE_FACTOR) if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
+    ret.steeringPressedSPAS = abs(ret.steeringTorque) > STEER_THRESHOLD + (220 * RATE_FACTOR) if self.mdps11_stat == 5 else abs(ret.steeringTorque) > STEER_THRESHOLD
     if Params().get_bool('SPASDebug'):
       print("Rate Factor  : ", RATE_FACTOR)
 
@@ -136,7 +135,7 @@ class CarState(CarStateBase):
     else:
       self.mdps_error_cnt = 0
 
-    ret.steerWarning = self.mdps_error_cnt > 50
+    ret.steerFaultTemporary = self.mdps_error_cnt > 50
 
     if self.CP.enableAutoHold:
       ret.autoHold = cp.vl["ESP11"]["AVH_STAT"]
@@ -171,6 +170,8 @@ class CarState(CarStateBase):
     ret.brake = 0
     ret.brakePressed = cp.vl["TCS13"]["DriverBraking"] != 0
     ret.brakeHoldActive = cp.vl["TCS15"]["AVH_LAMP"] == 2  # 0 OFF, 1 ERROR, 2 ACTIVE, 3 READY
+    ret.parkingBrake = cp.vl["TCS13"]["PBRAKE_ACT"] == 1
+    #ret.parkingBrake = cp.vl["CGW1"]["CF_Gway_ParkBrakeSw"]
 
     # TODO: Check this
     ret.brakeLights = bool(cp.vl["TCS13"]["BrakeLight"] or ret.brakePressed)
@@ -242,10 +243,7 @@ class CarState(CarStateBase):
       self.ems_366 = cp.vl["EMS_366"]
       self.ems11 = cp.vl["EMS11"]
       self.eems11 = cp.vl["E_EMS11"]
-      if self.spas_mode_sequence == 1:
-        self.sas11_angle = cp_mdps.vl["SAS11"]["SAS_Angle"]
-      elif self.spas_mode_sequence == 2:
-        self.mdps11_strang = cp_mdps.vl["MDPS11"]["CR_Mdps_StrAng"]
+      self.mdps11_strang = cp_mdps.vl["MDPS11"]["CR_Mdps_StrAng"]
       self.mdps11_stat_last = self.mdps11_stat
       self.mdps11_stat = cp_mdps.vl["MDPS11"]["CF_Mdps_Stat"]
       ret.mdps11Stat = cp_mdps.vl["MDPS11"]["CF_Mdps_Stat"]
