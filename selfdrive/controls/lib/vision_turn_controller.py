@@ -7,9 +7,10 @@ from common.realtime import sec_since_boot
 from selfdrive.config import Conversions as CV
 from selfdrive.controls.lib.lane_planner import TRAJECTORY_SIZE
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX
-
+from common.realtime import DT_CTRL
 
 _MIN_V = 5.6  # Do not operate under 20km/h
+_MAX_V = 26.4 # Do not operate above 95km/h (highway)
 
 _ENTERING_PRED_LAT_ACC_TH = 1.3  # Predicted Lat Acc threshold to trigger entering turn state.
 _ABORT_ENTERING_PRED_LAT_ACC_TH = 1.1  # Predicted Lat Acc threshold to abort entering state if speed drops.
@@ -35,10 +36,12 @@ _ENTERING_SMOOTH_DECEL_BP = [1.3, 3.]  # absolute value of lat acc ahead
 
 # Lookup table for the acceleration for the TURNING state
 # depending on the current lateral acceleration of the vehicle.
-_TURNING_ACC_V = [0.5, 0., -0.4]  # acc value
-_TURNING_ACC_BP = [1.5, 2.3, 3.]  # absolute value of current lat acc
+_TURNING_ACC_V = [0.5, 0., -0.2, -0.4]  # acc value
+_TURNING_ACC_BP = [1.5, 2.3, 3., 3.5]  # absolute value of current lat acc
+_TURNING_ACC_FLT_T = 0.5 # s turning state acceleration filter time constant.
+_ACC_FLT_FACT = DT_CTRL/_TURNING_ACC_FLT_T # between 0..1. 1 means no filter
 
-_LEAVING_ACC = 0.5  # Confortble acceleration to regain speed while leaving a turn.
+_LEAVING_ACC = 0.8  # stock 0.5; Confortble acceleration to regain speed while leaving a turn.
 
 _MIN_LANE_PROB = 0.6  # Minimum lanes probability to allow curvature prediction based on lanes.
 
@@ -103,6 +106,7 @@ class VisionTurnController():
     self._v_ego = 0.
     self._a_ego = 0.
     self._a_target = 0.
+    self._a_target_prev = 0.
     self._v_overshoot = 0.
     self._state = VisionTurnControllerState.disabled
 
@@ -226,6 +230,8 @@ class VisionTurnController():
       # Do not enter a turn control cycle if speed is low.
       if self._v_ego <= _MIN_V:
         pass
+      elif self._v_ego >= _MAX_V:
+        pass
       # If substantial lateral acceleration is predicted ahead, then move to Entering turn state.
       elif self._max_pred_lat_acc >= _ENTERING_PRED_LAT_ACC_TH:
         self.state = VisionTurnControllerState.entering
@@ -270,7 +276,9 @@ class VisionTurnController():
     # TURNING
     elif self.state == VisionTurnControllerState.turning:
       # When turning we provide a target acceleration that is confortable for the lateral accelearation felt.
-      a_target = interp(self._current_lat_acc, _TURNING_ACC_BP, _TURNING_ACC_V)
+      a_target_raw = interp(self._current_lat_acc, _TURNING_ACC_BP, _TURNING_ACC_V)
+      # Apply lowpass
+      a_target = a_target_raw*_ACC_FLT_FACT + self._a_target_prev*(1-_ACC_FLT_FACT)
     # LEAVING
     elif self.state == VisionTurnControllerState.leaving:
       # When leaving we provide a confortable acceleration to regain speed.
@@ -278,6 +286,7 @@ class VisionTurnController():
 
     # update solution values.
     self._a_target = a_target
+    self._a_target_prev = a_target
 
   def update(self, enabled, v_ego, a_ego, v_cruise_setpoint, sm):
     self._op_enabled = enabled
