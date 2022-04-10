@@ -107,6 +107,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"DisableRadar_Allow", PERSISTENT},
     {"DisableRadar", PERSISTENT}, // WARNING: THIS DISABLES AEB
     {"DisableUpdates", PERSISTENT},
+    {"GapAdjustCruise", PERSISTENT},
     {"DynamicLaneProfile", PERSISTENT},
     {"DongleId", PERSISTENT},
     {"DoReboot", CLEAR_ON_MANAGER_START},
@@ -116,6 +117,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"EnableWideCamera", CLEAR_ON_MANAGER_START},
     {"EndToEndToggle", PERSISTENT},
     {"ForcePowerDown", CLEAR_ON_MANAGER_START},
+    {"GapAdjustCruiseTr", PERSISTENT},
     {"GitBranch", PERSISTENT},
     {"GitCommit", PERSISTENT},
     {"GitDiff", PERSISTENT},

@@ -5,6 +5,7 @@ sunnypilot - Version 0.8.12-4 (2022-03-07)
 sunnypilot - Version 0.8.12-4 (2022-03-05)
 ========================
 * HOTFIX🛠: Add sentry logging
+* HOTFIX🛠: Disable errors due to non-comma-three hardware limitation
 
 sunnypilot - Version 0.8.12-4 (2022-03-03)
 ========================
@@ -51,6 +52,7 @@ sunnypilot - Version 0.8.12-3
 ========================
 * NEW❗: Bypass "System Malfunction" alert toggle
   * Prevent openpilot from returning the "System Malfunction" alert that hinders the ability use openpilot
+* FIXED: Hyundai/Kia/Genesis Brake Hold Active now outputs the correct events on screen with M.A.D.S. engaged
 
 sunnypilot - Version 0.8.12-2
 ========================

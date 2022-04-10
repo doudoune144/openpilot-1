@@ -212,7 +212,8 @@ struct CarState {
   standStill @49 :Bool;
   cruiseButtons @50 :UInt32;
   radarObjValid @51 :Bool;
-
+  gapAdjustCruiseTr @52 :Int32;
+  
   # which packets this state came from
   canMonoTimes @12: List(UInt64);
 

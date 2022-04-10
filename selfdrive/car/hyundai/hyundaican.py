@@ -83,12 +83,12 @@ def create_lfahda_mfc(packer, enabled, lkas_active, disengage_from_brakes, below
   }
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
-def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_speed, stopping):
+def create_acc_commands(packer, enabled, accel, jerk, idx, lead_visible, set_speed, stopping, tau_gap_set):
   commands = []
 
   scc11_values = {
     "MainMode_ACC": 1,
-    "TauGapSet": 4,
+    "TauGapSet": tau_gap_set,
     "VSetDis": set_speed if enabled else 0,
     "AliveCounterACC": idx % 0x10,
     "ObjValid": 1 if lead_visible else 0,
