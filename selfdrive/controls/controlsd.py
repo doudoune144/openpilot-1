@@ -21,6 +21,7 @@ from selfdrive.controls.lib.latcontrol_pid import LatControlPID
 from selfdrive.controls.lib.latcontrol_indi import LatControlINDI
 from selfdrive.controls.lib.latcontrol_lqr import LatControlLQR
 from selfdrive.controls.lib.latcontrol_angle import LatControlAngle
+from selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from selfdrive.controls.lib.events import Events, ET
 from selfdrive.controls.lib.alertmanager import AlertManager, set_offroad_alert
 from selfdrive.controls.lib.vehicle_model import VehicleModel
@@ -139,7 +140,7 @@ class Controls:
     self.lateral_control_method = 0
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CI)
-      self.lateral_control_method = 3
+      self.lateral_control_method = 4
     elif self.CP.lateralTuning.which() == 'pid':
       self.LaC = LatControlPID(self.CP, self.CI)
       self.lateral_control_method = 0
@@ -149,7 +150,9 @@ class Controls:
     elif self.CP.lateralTuning.which() == 'lqr':
       self.LaC = LatControlLQR(self.CP, self.CI)
       self.lateral_control_method = 2
-
+    elif self.CP.lateralTuning.which() == 'torque':
+      self.LaC = LatControlTorque(self.CP, self.CI)
+      self.lateral_control_method = 3
     self.controlsAllowed = False
 
     self.initialized = False
@@ -226,6 +229,11 @@ class Controls:
     self.osm_off_spdlimit_init = False
     self.v_cruise_kph_set_timer = 0
     self.safety_speed = 0
+    try:
+      self.roadname_and_slc = Params().get("RoadList", encoding="utf8").strip().splitlines()[1].split(',')
+    except:
+      self.roadname_and_slc = ""
+      pass
 
     self.desired_angle_deg = 0
 
@@ -651,7 +659,7 @@ class Controls:
                                                                              lat_plan.curvatures,
                                                                              lat_plan.curvatureRates)
       actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(lat_active, CS, self.CP, self.VM, params, self.last_actuators,
-                                                                             desired_curvature, desired_curvature_rate)
+                                                                             desired_curvature, desired_curvature_rate, self.sm['liveLocationKalman'])
       self.desired_angle_deg = actuators.steeringAngleDeg
     else:
       lac_log = log.ControlsState.LateralDebugState.new_message()
@@ -851,12 +859,16 @@ class Controls:
     controlsState.alertTextMsg2 = self.log_alertTextMsg2
     controlsState.alertTextMsg3 = self.log_alertTextMsg3
     controlsState.osmOffSpdLimit = self.osm_off_spdlimit
-    if int(self.sm['liveMapData'].speedLimit) and self.osm_speedlimit_enabled:
-      if self.stock_navi_info_enabled and int(CS.safetySign):
-        controlsState.limitSpeedCamera = min(int(round(self.sm['liveMapData'].speedLimit)), int(CS.safetySign))
-      else:
+    if self.osm_speedlimit_enabled:
+      if int(self.sm['liveMapData'].speedLimit):
         controlsState.limitSpeedCamera = int(round(self.sm['liveMapData'].speedLimit))
-      controlsState.limitSpeedCameraDist = float(self.sm['liveMapData'].speedLimitAheadDistance)
+        controlsState.limitSpeedCameraDist = float(self.sm['liveMapData'].speedLimitAheadDistance)
+      elif self.sm['liveMapData'].currentRoadName in self.roadname_and_slc:
+        try:
+          r_index = self.roadname_and_slc.index(self.sm['liveMapData'].currentRoadName)
+          controlsState.limitSpeedCamera = float(self.roadname_and_slc[r_index+1])
+        except:
+          pass
     elif self.map_enabled:
       controlsState.limitSpeedCamera = int(round(self.sm['liveNaviData'].speedLimit))
       controlsState.limitSpeedCameraDist = float(self.sm['liveNaviData'].speedLimitDistance)
@@ -885,6 +897,8 @@ class Controls:
       controlsState.lateralControlState.lqrState = lac_log
     elif lat_tuning == 'indi':
       controlsState.lateralControlState.indiState = lac_log
+    elif lat_tuning == 'torque':
+      controlsState.lateralControlState.torqueState = lac_log
     controlsState.steeringAngleDesiredDeg = self.desired_angle_deg
 
     self.pm.send('controlsState', dat)

@@ -96,6 +96,25 @@ function two_init {
     $NEOS_PY --swap-if-ready $MANIFEST
     $DIR/selfdrive/hardware/eon/updater $NEOS_PY $MANIFEST
   fi
+
+  # ssh key restore, by opkr
+  if [ -f "/data/params/d/OpkrSSHLegacy" ]; then
+    SSH_KEY=$(cat /data/params/d/OpkrSSHLegacy)
+  else
+    setprop persist.neos.ssh 1
+    cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
+    chmod 600 /data/params/d/GithubSshKeys
+  fi
+  if [ "$SSH_KEY" == "1" ]; then
+    cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
+    chmod 600 /data/params/d/GithubSshKeys
+  fi
+
+  if [ ! -f "/data/params/d/GithubSshKeys" ]; then
+    setprop persist.neos.ssh 1
+    cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
+    chmod 600 /data/params/d/GithubSshKeys
+  fi
 }
 
 function tici_init {
@@ -118,6 +137,25 @@ function tici_init {
       sudo reboot
     fi
     $DIR/selfdrive/hardware/tici/updater $AGNOS_PY $MANIFEST
+  fi
+  
+  # ssh key restore, by opkr
+  if [ -f "/data/params/d/OpkrSSHLegacy" ]; then
+    SSH_KEY=$(cat /data/params/d/OpkrSSHLegacy)
+  else
+    sudo echo "1" > /data/params/d/SshEnabled
+    sudo cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
+    sudo chmod 600 /data/params/d/GithubSshKeys
+  fi
+  if [ "$SSH_KEY" == "1" ]; then
+    sudo cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
+    sudo chmod 600 /data/params/d/GithubSshKeys
+  fi
+
+  if [ ! -f "/data/params/d/GithubSshKeys" ]; then
+    sudo echo "1" > /data/params/d/SshEnabled
+    sudo cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
+    sudo chmod 600 /data/params/d/GithubSshKeys
   fi
 }
 
@@ -180,25 +218,6 @@ function launch {
   # spinner, by opkr
   if [ -f "$BASEDIR/prebuilt" ]; then
     python /data/openpilot/common/spinner.py &
-  fi
-
-  # ssh key restore, by opkr
-  if [ -f "/data/params/d/OpkrSSHLegacy" ]; then
-    SSH_KEY=$(cat /data/params/d/OpkrSSHLegacy)
-  else
-    setprop persist.neos.ssh 1
-    cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
-    chmod 600 /data/params/d/GithubSshKeys
-  fi
-  if [ "$SSH_KEY" == "1" ]; then
-    cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
-    chmod 600 /data/params/d/GithubSshKeys
-  fi
-
-  if [ ! -f "/data/params/d/GithubSshKeys" ]; then
-    setprop persist.neos.ssh 1
-    cp -f /data/openpilot/selfdrive/assets/addon/key/GithubSshKeys_legacy /data/params/d/GithubSshKeys
-    chmod 600 /data/params/d/GithubSshKeys
   fi
 
   cat /data/openpilot/selfdrive/car/hyundai/values.py | grep ' = "' | awk -F'"' '{print $2}' > /data/params/d/CarList

@@ -49,7 +49,7 @@ class MapD():
     self._query_thread = None
     self._lock = threading.RLock()
     self.ms_to_spd = 3.6 if Params().get_bool("IsMetric") else 2.236936
-    self.roadname_and_offset = Params().get("RoadList", encoding="utf8").strip().split(',')
+    self.roadname_and_offset = Params().get("RoadList", encoding="utf8").strip().splitlines()[0].split(',')
 
   def udpate_state(self, sm):
     sock = 'controlsState'
@@ -201,6 +201,7 @@ class MapD():
     horizon_mts = self.gps_speed * LOOK_AHEAD_HORIZON_TIME
     next_turn_speed_limit_sections = self.route.next_curvature_speed_limit_sections(horizon_mts)
     current_road_name = self.route.current_road_name
+    ref = self.route.current_ref_num
 
     map_data_msg = messaging.new_message('liveMapData')
     map_data_msg.valid = sm.all_alive_and_valid(service_list=['gpsLocationExternal'])
@@ -238,9 +239,14 @@ class MapD():
         r_index = self.roadname_and_offset.index(current_road_name)
         map_data_msg.liveMapData.roadCameraOffset = float(self.roadname_and_offset[r_index+1])
       else:
-        map_data_msg.liveMapData.roadCameraOffset = 0.0        
+        map_data_msg.liveMapData.roadCameraOffset = 0.0
     else:
       map_data_msg.liveMapData.currentRoadName = ""
+
+    if ref is not None:
+      map_data_msg.liveMapData.ref = " (" + str(ref) + ")"
+    else:
+      map_data_msg.liveMapData.ref = ""
 
     pm.send('liveMapData', map_data_msg)
     _debug(f'Mapd *****: Publish: \n{map_data_msg}\n********')

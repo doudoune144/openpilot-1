@@ -486,6 +486,7 @@ struct CarParams {
     pid @26 :LateralPIDTuning;
     indi @27 :LateralINDITuning;
     lqr @40 :LateralLQRTuning;
+    torque @66 :LateralTorqueTuning;
   }
 
   steerLimitAlert @28 :Bool;
@@ -516,21 +517,21 @@ struct CarParams {
 
   wheelSpeedFactor @63 :Float32; # Multiplier on wheels speeds to computer actual speeds
 
-  mdpsBus @66: Int8;
-  sasBus @67: Int8;
-  sccBus @68: Int8;
-  fcaBus @69: Int8;
-  bsmAvailable @70: Bool;
-  lfaAvailable @71: Bool;
-  lvrAvailable @72: Bool;
-  evgearAvailable @73: Bool;
-  emsAvailable @74: Bool;
-  standStill @75: Bool;
-  vCruisekph @76: Float32;
-  resSpeed @77: Float32;
-  vFuture @78: Float32;
-  aqValue @79: Float32;
-  aqValueRaw @80: Float32;
+  mdpsBus @67: Int8;
+  sasBus @68: Int8;
+  sccBus @69: Int8;
+  fcaBus @70: Int8;
+  bsmAvailable @71: Bool;
+  lfaAvailable @72: Bool;
+  lvrAvailable @73: Bool;
+  evgearAvailable @74: Bool;
+  emsAvailable @75: Bool;
+  standStill @76: Bool;
+  vCruisekph @77: Float32;
+  resSpeed @78: Float32;
+  vFuture @79: Float32;
+  aqValue @80: Float32;
+  aqValueRaw @81: Float32;
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
@@ -547,17 +548,26 @@ struct CarParams {
     kf @6 :Float32;
   }
 
+  struct LateralTorqueTuning {
+    useSteeringAngle @0 :Bool;
+    kp @1 :Float32;
+    ki @2 :Float32;
+    friction @3 :Float32;
+    kf @4 :Float32;
+  }
+
   struct LongitudinalPIDTuning {
     kpBP @0 :List(Float32);
     kpV @1 :List(Float32);
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
+    kf @6 :Float32;
     deadzoneBP @4 :List(Float32);
     deadzoneV @5 :List(Float32);
-    kdBP @6 :List(Float32) = [0.];
-    kdV @7 :List(Float32) = [0.];
-    kfBP @8 :List(Float32);
-    kfV @9 :List(Float32);
+    kdBP @7 :List(Float32) = [0.];
+    kdV @8 :List(Float32) = [0.];
+    kfBP @9 :List(Float32);
+    kfV @10 :List(Float32);
   }
 
   struct LateralINDITuning {

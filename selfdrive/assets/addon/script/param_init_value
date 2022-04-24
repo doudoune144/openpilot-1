@@ -26,6 +26,12 @@ PidKp:25
 PidKi:50
 PidKd:150
 PidKf:7
+TorqueKp:20
+TorqueKf:10
+TorqueKi:5
+TorqueFriction:1
+TorqueUseAngle:1
+TorqueMaxLatAccel:30
 CameraOffsetAdj:60
 PathOffsetAdj:0
 SteerRatioAdj:1550
@@ -127,4 +133,5 @@ AvoidLKASFaultMaxFrame:90
 AvoidLKASFaultBeyond:0
 UseStockDecelOnSS:0
 AnimatedRPM:1
+AnimatedRPMMax:3600
 ShowStopLine:0

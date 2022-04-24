@@ -210,6 +210,12 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"PidKi", PERSISTENT},
     {"PidKd", PERSISTENT},
     {"PidKf", PERSISTENT},
+    {"TorqueKp", PERSISTENT},
+    {"TorqueKf", PERSISTENT},
+    {"TorqueKi", PERSISTENT},
+    {"TorqueFriction", PERSISTENT},
+    {"TorqueUseAngle", PERSISTENT},
+    {"TorqueMaxLatAccel", PERSISTENT},
     {"CameraOffsetAdj", PERSISTENT},
     {"PathOffsetAdj", PERSISTENT},
     {"SteerRatioAdj", PERSISTENT},
@@ -336,6 +342,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"DesiredCurvatureLimit", PERSISTENT},
     {"C2WithCommaPower", PERSISTENT},
     {"RoutineDriveOn", PERSISTENT},
+    {"RoutineDriveOption", PERSISTENT},
     {"RoadList", PERSISTENT},
     {"LaneWidth", PERSISTENT},
     {"SpdLaneWidthSpd", PERSISTENT},
@@ -349,6 +356,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"AvoidLKASFaultBeyond", PERSISTENT},
     {"UseStockDecelOnSS", PERSISTENT},
     {"AnimatedRPM", PERSISTENT},
+    {"AnimatedRPMMax", PERSISTENT},
     {"ShowStopLine", PERSISTENT},
 };
 

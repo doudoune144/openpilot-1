@@ -557,6 +557,7 @@ UIPanel::UIPanel(QWidget *parent) : QFrame(parent) {
   layout->addWidget(new GoogleMapEnabledToggle());
   layout->addWidget(new OPKRTopTextView());
   layout->addWidget(new RPMAnimatedToggle());
+  layout->addWidget(new RPMAnimatedMaxValue());
   layout->addWidget(new ShowStopLineToggle());
 }
 
@@ -608,6 +609,7 @@ DrivingPanel::DrivingPanel(QWidget *parent) : QFrame(parent) {
   layout->addWidget(new SpeedLaneWidthUD());
   layout->addWidget(new SpeedLaneWidth());
   layout->addWidget(new RoutineDriveOnToggle());
+  layout->addWidget(new RoutineDriveOption());
   layout->addWidget(new CloseToRoadEdgeToggle());
   layout->addWidget(new OPKREdgeOffset());
   layout->addWidget(new ToAvoidLKASFaultToggle());
@@ -716,6 +718,13 @@ TuningPanel::TuningPanel(QWidget *parent) : QFrame(parent) {
     layout->addWidget(new Scale());
     layout->addWidget(new LqrKi());
     layout->addWidget(new DcGain());
+  } else if (lat_control == "3") {
+    layout->addWidget(new TorqueMaxLatAccel());
+    layout->addWidget(new TorqueKp());
+    layout->addWidget(new TorqueKf());
+    layout->addWidget(new TorqueKi());
+    layout->addWidget(new TorqueFriction());
+    layout->addWidget(new TorqueUseAngle());
   }
 
   layout->addWidget(horizontal_line());

@@ -56,6 +56,19 @@ class NaviControl():
     self.cut_in = False
     self.cut_in_run_timer = 0
 
+    self.drive_routine_on_sl = Params().get_bool("RoutineDriveOn")
+    if self.drive_routine_on_sl:
+      option_list = list(Params().get("RoutineDriveOption", encoding="utf8"))
+      if '1' in option_list:
+        self.drive_routine_on_sl = True
+      else:
+        self.drive_routine_on_sl = False
+    try:
+      self.roadname_and_sl = Params().get("RoadList", encoding="utf8").strip().splitlines()[1].split(',')
+    except:
+      self.roadname_and_sl = ""
+      pass
+
     self.na_timer = 0
     self.t_interval = 7
     self.faststart = False
@@ -154,12 +167,14 @@ class NaviControl():
     #  return  cruise_set_speed_kph
 
     if not self.speedlimit_decel_off:
-      if (self.sm['liveMapData'].speedLimit > 19 or self.sm['liveMapData'].speedLimitAhead > 19) and self.osm_speedlimit_enabled and not self.sm['controlsState'].osmOffSpdLimit:  # osm speedlimit
-        # spdTarget = cruiseState_speed
-        if self.stock_navi_info_enabled and CS.safety_sign > 19:
-          spdTarget = min(self.sm['liveMapData'].speedLimit, CS.safety_sign)
-        else:
+      if self.osm_speedlimit_enabled and not self.sm['controlsState'].osmOffSpdLimit:  # osm speedlimit
+        if self.sm['liveMapData'].speedLimit > 19 or self.sm['liveMapData'].speedLimitAhead > 19:
+          # spdTarget = cruiseState_speed
           spdTarget = self.sm['liveMapData'].speedLimit
+          if spdTarget == 0 and self.drive_routine_on_sl:
+            if self.sm['liveMapData'].currentRoadName in self.roadname_and_sl:
+              r_index = self.roadname_and_sl.index(self.sm['liveMapData'].currentRoadName)
+              spdTarget = float(self.roadname_and_sl[r_index+1])
           self.map_speed = self.sm['liveMapData'].speedLimitAhead
           self.map_speed_dist = max(0, self.sm['liveMapData'].speedLimitAheadDistance)
           cam_distance_calc = 0
@@ -180,18 +195,34 @@ class NaviControl():
           else:
             self.onSpeedControl = False
             return cruise_set_speed_kph
-        if self.map_spdlimit_offset_option == 0:
-          cruise_set_speed_kph = spdTarget + round(spdTarget*0.01*self.map_spdlimit_offset)
-        elif self.map_spdlimit_offset_option == 1:
-          cruise_set_speed_kph = spdTarget + self.map_spdlimit_offset
-        else:
-          cruise_set_speed_kph = int(interp(spdTarget, self.osm_custom_spdlimit_c, self.osm_custom_spdlimit_t))
-        if cruise_set_speed_kph+1.5 < v_ego_mph and CS.is_set_speed_in_mph and not CS.out.gasPressed:
-          self.onSpeedControl = True
-        elif cruise_set_speed_kph+1.5 < v_ego_kph and not CS.is_set_speed_in_mph and not CS.out.gasPressed:
-          self.onSpeedControl = True
-        else:
-          self.onSpeedControl = False
+          if self.map_spdlimit_offset_option == 0:
+            cruise_set_speed_kph = spdTarget + round(spdTarget*0.01*self.map_spdlimit_offset)
+          elif self.map_spdlimit_offset_option == 1:
+            cruise_set_speed_kph = spdTarget + self.map_spdlimit_offset
+          else:
+            cruise_set_speed_kph = int(interp(spdTarget, self.osm_custom_spdlimit_c, self.osm_custom_spdlimit_t))
+          if cruise_set_speed_kph+1.5 < v_ego_mph and CS.is_set_speed_in_mph and not CS.out.gasPressed:
+            self.onSpeedControl = True
+          elif cruise_set_speed_kph+1.5 < v_ego_kph and not CS.is_set_speed_in_mph and not CS.out.gasPressed:
+            self.onSpeedControl = True
+          else:
+            self.onSpeedControl = False
+        elif self.drive_routine_on_sl:
+          if self.sm['liveMapData'].currentRoadName in self.roadname_and_sl:
+            r_index = self.roadname_and_sl.index(self.sm['liveMapData'].currentRoadName)
+            spdTarget = float(self.roadname_and_sl[r_index+1])
+            if self.map_spdlimit_offset_option == 0:
+              cruise_set_speed_kph = spdTarget + round(spdTarget*0.01*self.map_spdlimit_offset)
+            elif self.map_spdlimit_offset_option == 1:
+              cruise_set_speed_kph = spdTarget + self.map_spdlimit_offset
+            else:
+              cruise_set_speed_kph = int(interp(spdTarget, self.osm_custom_spdlimit_c, self.osm_custom_spdlimit_t))
+            if cruise_set_speed_kph+1.5 < v_ego_mph and CS.is_set_speed_in_mph and not CS.out.gasPressed:
+              self.onSpeedControl = True
+            elif cruise_set_speed_kph+1.5 < v_ego_kph and not CS.is_set_speed_in_mph and not CS.out.gasPressed:
+              self.onSpeedControl = True
+            else:
+              self.onSpeedControl = False
       elif CS.map_enabled and self.liveNaviData.speedLimit > 19:  # mappy speedlimit
         self.map_speed_dist = max(0, self.liveNaviData.speedLimitDistance - 30)
         self.map_speed = self.liveNaviData.speedLimit

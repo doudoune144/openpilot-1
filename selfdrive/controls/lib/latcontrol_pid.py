@@ -42,7 +42,7 @@ class LatControlPID(LatControl):
                           k_f=self.steerKf, pos_limit=1.0)
       self.mpc_frame = 0
 
-  def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate):
+  def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate, llk):
     self.lp_timer += 1
     if self.lp_timer > 100:
       self.lp_timer = 0
@@ -56,9 +56,10 @@ class LatControlPID(LatControl):
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
+    error = angle_steers_des - CS.steeringAngleDeg
 
     pid_log.steeringAngleDesiredDeg = angle_steers_des
-    pid_log.angleError = angle_steers_des - CS.steeringAngleDeg
+    pid_log.angleError = error
     if CS.vEgo < MIN_STEER_SPEED or not active:
       output_steer = 0.0
       pid_log.active = False

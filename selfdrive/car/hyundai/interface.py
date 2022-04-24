@@ -2,6 +2,7 @@
 from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV
+from selfdrive.car.hyundai.tunes import LatTunes, LongTunes, set_long_tune, set_lat_tune
 from selfdrive.car.hyundai.values import CAR, EV_CAR, HYBRID_CAR, Buttons, CarControllerParams
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -86,17 +87,6 @@ class CarInterface(CarInterfaceBase):
     ret.aqValueRaw = 0
 
     params = Params()
-    PidKp = float(Decimal(params.get("PidKp", encoding="utf8")) * Decimal('0.01'))
-    PidKi = float(Decimal(params.get("PidKi", encoding="utf8")) * Decimal('0.001'))
-    PidKd = float(Decimal(params.get("PidKd", encoding="utf8")) * Decimal('0.01'))
-    PidKf = float(Decimal(params.get("PidKf", encoding="utf8")) * Decimal('0.00001'))
-    InnerLoopGain = float(Decimal(params.get("InnerLoopGain", encoding="utf8")) * Decimal('0.1'))
-    OuterLoopGain = float(Decimal(params.get("OuterLoopGain", encoding="utf8")) * Decimal('0.1'))
-    TimeConstant = float(Decimal(params.get("TimeConstant", encoding="utf8")) * Decimal('0.1'))
-    ActuatorEffectiveness = float(Decimal(params.get("ActuatorEffectiveness", encoding="utf8")) * Decimal('0.1'))
-    Scale = float(Decimal(params.get("Scale", encoding="utf8")) * Decimal('1.0'))
-    LqrKi = float(Decimal(params.get("LqrKi", encoding="utf8")) * Decimal('0.001'))
-    DcGain = float(Decimal(params.get("DcGain", encoding="utf8")) * Decimal('0.00001'))
 
     tire_stiffness_factor = float(Decimal(params.get("TireStiffnessFactorAdj", encoding="utf8")) * Decimal('0.01'))
     ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
@@ -106,53 +96,13 @@ class CarInterface(CarInterfaceBase):
 
     lat_control_method = int(params.get("LateralControlMethod", encoding="utf8"))
     if lat_control_method == 0:
-      ret.lateralTuning.pid.kf = PidKf
-      ret.lateralTuning.pid.kpBP = [0., 9.]
-      ret.lateralTuning.pid.kpV = [0.1, PidKp]
-      ret.lateralTuning.pid.kiBP = [0., 9.]
-      ret.lateralTuning.pid.kiV = [0.01, PidKi]
-      ret.lateralTuning.pid.kdBP = [0.]
-      ret.lateralTuning.pid.kdV = [PidKd]
+      set_lat_tune(ret.lateralTuning, LatTunes.PID)
     elif lat_control_method == 1:
-      ret.lateralTuning.init('indi')
-      ret.lateralTuning.indi.innerLoopGainBP = [0., 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS]
-      ret.lateralTuning.indi.innerLoopGainV = [InnerLoopGain, InnerLoopGain*1.5, InnerLoopGain*1.65] # third tune. Highest value that still gives smooth control. Effects turning into curves.
-      ret.lateralTuning.indi.outerLoopGainBP = [0., 60.*CV.KPH_TO_MS]
-      ret.lateralTuning.indi.outerLoopGainV = [OuterLoopGain, OuterLoopGain*1.9] # forth tune. Highest value that still gives smooth control. Effects lane centering.
-      ret.lateralTuning.indi.timeConstantBP = [0.]
-      ret.lateralTuning.indi.timeConstantV = [TimeConstant] # second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
-      ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
-      ret.lateralTuning.indi.actuatorEffectivenessV = [ActuatorEffectiveness] # first tune. Lowest value without oversteering. May vary with speed.
-      # lateralTuning.indi.actuatorEffectiveness
-        # As effectiveness increases, actuation strength decreases
-        # Too high: weak, sloppy lane centering, slow oscillation, can't follow high curvature, high steering error causes snappy corrections
-        # Too low: overpower, saturation, jerky, fast oscillation
-        # Just right: Highest still able to maintain good lane centering.
-      # lateralTuning.indi.timeConstant
-        # Extend exponential decay of prior output steer
-        # Too high: sloppy lane centering
-        # Too low: noisy actuation, responds to every bump, maybe unable to maintain lane center due to rapid actuation
-        # Just right: above noisy actuation and lane centering instability
-      # lateralTuning.indi.innerLoopGain
-        # Steer rate error gain
-        # Too high: jerky oscillation in high curvature
-        # Too low: sloppy, cannot accomplish desired steer angle
-        # Just right: brief snap on entering high curvature
-      # lateralTuning.indi.outerLoopGain
-        # Steer error gain
-        # Too high: twitchy hyper lane centering, oversteering
-        # Too low: sloppy, all over lane
-        # Just right: crisp lane centering
+      set_lat_tune(ret.lateralTuning, LatTunes.INDI)
     elif lat_control_method == 2:
-      ret.lateralTuning.init('lqr')
-      ret.lateralTuning.lqr.scale = Scale
-      ret.lateralTuning.lqr.ki = LqrKi
-      ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-      ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-      ret.lateralTuning.lqr.c = [1., 0.]
-      ret.lateralTuning.lqr.k = [-110., 451.]
-      ret.lateralTuning.lqr.l = [0.33, 0.318]
-      ret.lateralTuning.lqr.dcGain = DcGain
+      set_lat_tune(ret.lateralTuning, LatTunes.LQR)
+    elif lat_control_method == 3:
+      set_lat_tune(ret.lateralTuning, LatTunes.TORQUE)
 
     # genesis
     if candidate == CAR.GENESIS:

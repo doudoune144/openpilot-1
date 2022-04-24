@@ -213,6 +213,7 @@ typedef struct UIScene {
   int pidKp, pidKi, pidKd, pidKf;
   int indiInnerLoopGain, indiOuterLoopGain, indiTimeConstant, indiActuatorEffectiveness;
   int lqrScale, lqrKi, lqrDcGain;
+  int torqueKp, torqueKf, torqueKi, torqueFriction, torqueMaxLatAccel;
   bool live_tune_panel_enable;
   int top_text_view;
   int live_tune_panel_list = 0;
@@ -245,7 +246,9 @@ typedef struct UIScene {
   float ctrl_speed;
   float accel;
   bool animated_rpm;
+  int max_animated_rpm;
   bool stop_line;
+  int gear_step;
 
   cereal::DeviceState::Reader deviceState;
   cereal::CarState::Reader car_state;
@@ -321,6 +324,7 @@ typedef struct UIScene {
     float oturnSpeedLimitEndDistance;
     int oturnSpeedLimitSign;
     std::string ocurrentRoadName;
+    std::string oref;
     //float turnSpeedLimitsAhead[16]; // List
     //float turnSpeedLimitsAheadDistances[16]; // List
     //int turnSpeedLimitsAheadSigns[16]; // List

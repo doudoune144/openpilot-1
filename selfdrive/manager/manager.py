@@ -73,6 +73,12 @@ def manager_init() -> None:
     ("PidKi", "50"),
     ("PidKd", "150"),
     ("PidKf", "7"),
+    ("TorqueKp", "20"),
+    ("TorqueKf", "10"),
+    ("TorqueKi", "5"),
+    ("TorqueFriction", "1"),
+    ("TorqueUseAngle", "1"),
+    ("TorqueMaxLatAccel", "30"),
     ("CameraOffsetAdj", "60"),
     ("PathOffsetAdj", "0"),
     ("SteerRatioAdj", "1550"),
@@ -185,7 +191,7 @@ def manager_init() -> None:
     ("DesiredCurvatureLimit", "5"),
     ("C2WithCommaPower", "0"),
     ("CustomTREnabled", "0"),
-    ("RoadList", "RoadName1,+0.0,RoadName2,-0.0"),
+    ("RoadList", "RoadName1,+0.0,RoadName2,-0.0\nRoadName3,30,RoadName4,60"),
     ("LaneWidth", "37"),
     ("SpdLaneWidthSpd", "0,31"),
     ("SpdLaneWidthSet", "2.8,3.5"),
@@ -199,8 +205,11 @@ def manager_init() -> None:
     ("AvoidLKASFaultBeyond", "0"),
     ("UseStockDecelOnSS", "0"),
     ("AnimatedRPM", "1"),
+    ("AnimatedRPMMax", "3600"),
     ("ShowStopLine", "0"),
-  ]
+    ("RoutineDriveOption", "OPKR"),
+    ("SshEnabled", "1"),
+   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
 

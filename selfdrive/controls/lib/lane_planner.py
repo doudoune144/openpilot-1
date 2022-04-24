@@ -53,7 +53,14 @@ class LanePlanner:
     self.left_curv_offset = int(Params().get("LeftCurvOffsetAdj", encoding="utf8"))
     self.right_curv_offset = int(Params().get("RightCurvOffsetAdj", encoding="utf8"))
 
-    self.drive_routine_on = Params().get_bool("RoutineDriveOn")
+    self.drive_routine_on_co = Params().get_bool("RoutineDriveOn")
+    if self.drive_routine_on_co:
+      option_list = list(Params().get("RoutineDriveOption", encoding="utf8"))
+      if '0' in option_list:
+        self.drive_routine_on_co = True
+      else:
+        self.drive_routine_on_co = False
+
     self.drive_close_to_edge = Params().get_bool("CloseToRoadEdge")
     self.left_edge_offset = float(Decimal(Params().get("LeftEdgeOffset", encoding="utf8")) * Decimal('0.01'))
     self.right_edge_offset = float(Decimal(Params().get("RightEdgeOffset", encoding="utf8")) * Decimal('0.01'))
@@ -68,7 +75,7 @@ class LanePlanner:
   def parse_model(self, md, sm, v_ego):
     curvature = sm['controlsState'].curvature
     mode_select = sm['carState'].cruiseState.modeSel
-    if self.drive_routine_on:
+    if self.drive_routine_on_co:
       self.sm.update(0)
       current_road_offset = -self.sm['liveMapData'].roadCameraOffset
     else:
@@ -106,8 +113,6 @@ class LanePlanner:
     self.lp_timer += DT_MDL
     if self.lp_timer > 1.0:
       self.lp_timer = 0.0
-      self.drive_routine_on = Params().get_bool("RoutineDriveOn")
-      self.drive_close_to_edge = Params().get_bool("CloseToRoadEdge")
       if Params().get_bool("OpkrLiveTunePanelEnable"):
         self.camera_offset = -(float(Decimal(Params().get("CameraOffsetAdj", encoding="utf8")) * Decimal('0.001')))
 
