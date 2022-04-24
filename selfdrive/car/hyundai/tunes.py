@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from enum import Enum
 from common.params import Params
+from common.conversions import Conversions as CV
 from decimal import Decimal
 
 class LongTunes(Enum):
@@ -76,10 +77,10 @@ def set_lat_tune(tune, name, max_lat_accel=2.5, FRICTION=.1):
     TimeConstant = float(Decimal(params.get("TimeConstant", encoding="utf8")) * Decimal('0.1'))
     ActuatorEffectiveness = float(Decimal(params.get("ActuatorEffectiveness", encoding="utf8")) * Decimal('0.1'))
     tune.init('indi')
-    tune.indi.innerLoopGainBP = [0.]
-    tune.indi.innerLoopGainV = [InnerLoopGain] # 4.0, third tune. Highest value that still gives smooth control. Effects turning into curves.
-    tune.indi.outerLoopGainBP = [0.]
-    tune.indi.outerLoopGainV = [OuterLoopGain] # 3.0, forth tune. Highest value that still gives smooth control. Effects lane centering.
+    tune.indi.innerLoopGainBP = [0., 60.*CV.KPH_TO_MS, 80.*CV.KPH_TO_MS]
+    tune.indi.innerLoopGainV = [InnerLoopGain, InnerLoopGain*1.5, InnerLoopGain*1.65] # 4.0, third tune. Highest value that still gives smooth control. Effects turning into curves.
+    tune.indi.outerLoopGainBP = [0., 60.*CV.KPH_TO_MS]
+    tune.indi.outerLoopGainV = [OuterLoopGain, OuterLoopGain*1.9] # 3.0, forth tune. Highest value that still gives smooth control. Effects lane centering.
     tune.indi.timeConstantBP = [0.]
     tune.indi.timeConstantV = [TimeConstant] # 1.0, second tune. Lowest value with smooth actuation. Avoid the noise of actuator gears thrashing.
     tune.indi.actuatorEffectivenessBP = [0.]
