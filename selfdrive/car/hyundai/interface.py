@@ -22,7 +22,8 @@ class CarInterface(CarInterfaceBase):
 
     self.blinker_status = 0
     self.blinker_timer = 0
-    self.mad_mode_enabled = Params().get_bool('MadModeEnabled')
+    self.ufc_mode_enabled = Params().get_bool('UFCModeEnabled')
+    self.no_mdps_mods = Params().get_bool('NoSmartMDPS')
 
   @staticmethod
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
@@ -50,6 +51,8 @@ class CarInterface(CarInterfaceBase):
     ret.standStill = False
     ret.openpilotLongitudinalControl = Params().get_bool("RadarDisable") or ret.sccBus == 2
     ret.safetyParam = 0
+
+    ret.minSteerSpeed = 16.67 # m/s
 
     # Most Hyundai car ports are community features for now
     ret.pcmCruise = not ret.radarOffCan
@@ -218,7 +221,7 @@ class CarInterface(CarInterfaceBase):
     #  ret.safetyParam |= Panda.FLAG_HYUNDAI_LONG
 
     # set safety_hyundai_community only for non-SCC, MDPS harrness or SCC harrness cars or cars that have unknown issue
-    if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or params.get_bool("MadModeEnabled"):
+    if ret.radarOffCan or ret.mdpsBus == 1 or ret.openpilotLongitudinalControl or params.get_bool("UFCModeEnabled"):
       ret.safetyModel = car.CarParams.SafetyModel.hyundaiCommunity
     return ret
 
@@ -246,15 +249,8 @@ class CarInterface(CarInterfaceBase):
       self.CP.pcmCruise = True
 
     # most HKG cars has no long control, it is safer and easier to engage by main on
-    if self.mad_mode_enabled:
+    if self.ufc_mode_enabled:
       ret.cruiseState.enabled = ret.cruiseState.available
-
-
-    # low speed steer alert hysteresis logic (only for cars with steer cut off above 10 m/s)
-    if ret.vEgo < (self.CP.minSteerSpeed + 0.2) and self.CP.minSteerSpeed > 10.:
-      self.low_speed_alert = True
-    if ret.vEgo > (self.CP.minSteerSpeed + 0.7):
-      self.low_speed_alert = False
 
     buttonEvents = []
     if self.CS.cruise_buttons != self.CS.prev_cruise_buttons:
@@ -285,10 +281,10 @@ class CarInterface(CarInterfaceBase):
       events.add(EventName.brakeUnavailable)
     #if abs(ret.steeringAngle) > 90. and EventName.steerTempUnavailable not in events.events:
     #  events.add(EventName.steerTempUnavailable)
-    # if self.low_speed_alert:
-    #   events.add(EventName.belowSteerSpeed)
-    # if self.mad_mode_enabled and EventName.pedalPressed in events.events:
+    # if self.ufc_mode_enabled and EventName.pedalPressed in events.events:
     #   events.events.remove(EventName.pedalPressed)
+    if ret.vEgo < self.CP.minSteerSpeed and self.no_mdps_mods:
+      events.add(car.CarEvent.EventName.belowSteerSpeed)
     if self.CC.lanechange_manual_timer and ret.vEgo > 0.3:
       events.add(EventName.laneChangeManual)
     if self.CC.emergency_manual_timer:

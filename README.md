@@ -170,12 +170,16 @@ Developer Menu
  - Cruise Button Spamming to adjust car set speed without longitudinal control, using OP target speed to keep certain distance to lead car.    Variable scc speed control for smooth deceleration (better than stock) when you approach the lead car, and smooth acceleration.
  - SmartMDPS support for steering down to 0 mph.
  - Auto Recognition of SCC bus on CAN 2 for long control.
- - Full time lateral control (MAD).
  - Variable color speed display, braking shades of red, acceleration shades of green, coasting (no brake, no gas) white.
  - OSM integration for auto SCC speed adjust via button spamming and slow down on curve using custom UI settings.
  - 2 Users presets.
  - Auto lane mode selection (laneless or lanefull).
  - No ssh knowledge required, as most paramater can be adjusted via UI.
+
+5. User-Friendly Control Mode(UFC)
+ - Full time lateral control
+ - Auto Resume while Driving
+ - Seperate Lat/StockLong - To be Developed
 
 ![](https://i.imgur.com/b0ZyIx5.jpg)
 

@@ -130,14 +130,14 @@ public:
   }
 };
 
-class MadModeEnabledToggle : public ToggleControl {
+class UFCModeEnabledToggle : public ToggleControl {
   Q_OBJECT
 
 public:
-  MadModeEnabledToggle() : ToggleControl("MainSwitch Openpilot ON/OFF", "Activate the open pilot using the cruise Main Switch.", "../assets/offroad/icon_shell.png", Params().getBool("MadModeEnabled")) {
-    QObject::connect(this, &MadModeEnabledToggle::toggleFlipped, [=](int state) {
+  UFCModeEnabledToggle() : ToggleControl("User-Friendly Control(UFC) Mode", "OP activates with Main Cruise Switch, AutoRES while driving, Seperate Lat/Long and etc", "../assets/offroad/icon_shell.png", Params().getBool("UFCModeEnabled")) {
+    QObject::connect(this, &UFCModeEnabledToggle::toggleFlipped, [=](int state) {
       bool status = state ? true : false;
-      Params().putBool("MadModeEnabled", status);
+      Params().putBool("UFCModeEnabled", status);
     });
   }
 };
@@ -722,6 +722,18 @@ public:
     QObject::connect(this, &ShowStopLineToggle::toggleFlipped, [=](int state) {
       bool status = state ? true : false;
       Params().putBool("ShowStopLine", status);
+    });
+  }
+};
+
+class NoSmartMDPSToggle : public ToggleControl {
+  Q_OBJECT
+
+public:
+  NoSmartMDPSToggle() : ToggleControl("No Smart MDPS", "Turn on, if you have no smartmdps or no mdps harness to avoid sending can under certain speed that is not able to use lane keeping.", "../assets/offroad/icon_shell.png", Params().getBool("NoSmartMDPS")) {
+    QObject::connect(this, &NoSmartMDPSToggle::toggleFlipped, [=](int state) {
+      bool status = state ? true : false;
+      Params().putBool("NoSmartMDPS", status);
     });
   }
 };
@@ -2255,5 +2267,19 @@ private:
   QLabel label;
   Params params;
   
+  void refresh();
+};
+
+class UserSpecificFeature : public AbstractControl {
+  Q_OBJECT
+
+public:
+  UserSpecificFeature();
+
+private:
+  QPushButton btn;
+  QLineEdit edit;
+  Params params;
+
   void refresh();
 };

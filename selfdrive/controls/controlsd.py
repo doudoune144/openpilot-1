@@ -109,11 +109,12 @@ class Controls:
     openpilot_enabled_toggle = params.get_bool("OpenpilotEnabledToggle")
     passive = params.get_bool("Passive") or not openpilot_enabled_toggle
     self.commIssue_ignored = params.get_bool("ComIssueGone")
-    self.auto_enabled = params.get_bool("AutoEnable") and params.get_bool("MadModeEnabled")
+    self.auto_enabled = params.get_bool("AutoEnable") and params.get_bool("UFCModeEnabled")
     self.batt_less = params.get_bool("OpkrBattLess")
     self.variable_cruise = params.get_bool('OpkrVariableCruise')
     self.cruise_over_maxspeed = params.get_bool('CruiseOverMaxSpeed')
     self.stock_lkas_on_disengaged_status = params.get_bool('StockLKASEnabled')
+    self.no_mdps_mods = params.get_bool('NoSmartMDPS')
 
     # detect sound card presence and ensure successful init
     sounds_available = HARDWARE.get_sound_card_online()
@@ -216,7 +217,7 @@ class Controls:
     self.second = 0.0
     self.map_enabled = False
     self.lane_change_delay = int(Params().get("OpkrAutoLaneChangeDelay", encoding="utf8"))
-    self.auto_enable_speed = max(1, int(Params().get("AutoEnableSpeed", encoding="utf8")))
+    self.auto_enable_speed = max(1, int(Params().get("AutoEnableSpeed", encoding="utf8"))) if int(Params().get("AutoEnableSpeed", encoding="utf8")) > -1 else int(Params().get("AutoEnableSpeed", encoding="utf8"))
     self.e2e_long_alert_prev = True
     self.stock_navi_info_enabled = Params().get_bool("StockNaviSpeedEnabled")
     self.ignore_can_error_on_isg = Params().get_bool("IgnoreCANErroronISG")
@@ -431,7 +432,7 @@ class Controls:
     #  self.events.add(EventName.noTarget)
 
     # atom
-    if self.auto_enabled:
+    if self.auto_enabled and not self.no_mdps_mods:
       self.ready_timer += 1 if self.ready_timer < 350 else 350
       self.auto_enable( CS )
 
@@ -653,7 +654,7 @@ class Controls:
       actuators.accel, actuators.oaccel = self.LoC.update(self.active and CS.cruiseState.speed > 1., CS, self.CP, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
 
       # Steering PID loop and lateral MPC
-      lat_active = self.active and not CS.steerFaultPermanent and CS.vEgo > self.CP.minSteerSpeed
+      lat_active = self.active and not CS.steerFaultPermanent and not (CS.vEgo < self.CP.minSteerSpeed and self.no_mdps_mods)
       desired_curvature, desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
                                                                              lat_plan.psis,
                                                                              lat_plan.curvatures,
@@ -745,9 +746,9 @@ class Controls:
     hudControl.rightLaneVisible = True
     hudControl.leftLaneVisible = True
 
-    speeds = self.sm['longitudinalPlan'].speeds
+    speeds = self.sm['longitudinalPlan'].speeds # 17 lists
     if len(speeds) > 1:
-      v_future = speeds[-1]
+      v_future = speeds[0]
     else:
       v_future = 100.0
     v_future_speed= float((v_future * CV.MS_TO_MPH + 10.0) if CS.isMph else (v_future * CV.MS_TO_KPH))

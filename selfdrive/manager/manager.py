@@ -76,7 +76,7 @@ def manager_init() -> None:
     ("TorqueKp", "20"),
     ("TorqueKf", "10"),
     ("TorqueKi", "5"),
-    ("TorqueFriction", "1"),
+    ("TorqueFriction", "10"),
     ("TorqueUseAngle", "1"),
     ("TorqueMaxLatAccel", "30"),
     ("CameraOffsetAdj", "60"),
@@ -134,7 +134,7 @@ def manager_init() -> None:
     ("OpkrMonitorEyesThreshold", "45"),
     ("OpkrMonitorNormalEyesThreshold", "45"),
     ("OpkrMonitorBlinkThreshold", "35"),
-    ("MadModeEnabled", "1"),
+    ("UFCModeEnabled", "1"),
     ("WhitePandaSupport", "0"),
     ("SteerWarningFix", "0"),
     ("OpkrRunNaviOnBoot", "0"),
@@ -209,6 +209,8 @@ def manager_init() -> None:
     ("ShowStopLine", "0"),
     ("RoutineDriveOption", "OPKR"),
     ("SshEnabled", "1"),
+    ("UserSpecificFeature", "0"),
+    ("OpkrWakeUp", "0"),
    ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))

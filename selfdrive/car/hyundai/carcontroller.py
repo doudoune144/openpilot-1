@@ -99,7 +99,7 @@ class CarController():
 
     self.opkr_turnsteeringdisable = self.params.get_bool("OpkrTurnSteeringDisable")
     self.opkr_maxanglelimit = float(int(self.params.get("OpkrMaxAngleLimit", encoding="utf8")))
-    self.mad_mode_enabled = self.params.get_bool("MadModeEnabled")
+    self.ufc_mode_enabled = self.params.get_bool("UFCModeEnabled")
     self.ldws_fix = self.params.get_bool("LdwsCarFix")
     self.radar_helper_option = int(self.params.get("RadarLongHelper", encoding="utf8"))
     self.stopping_dist_adj_enabled = self.params.get_bool("StoppingDistAdj")
@@ -172,6 +172,7 @@ class CarController():
     self.to_avoid_lkas_fault_max_angle = int(self.params.get("AvoidLKASFaultMaxAngle", encoding="utf8"))
     self.to_avoid_lkas_fault_max_frame = int(self.params.get("AvoidLKASFaultMaxFrame", encoding="utf8"))
     self.enable_steer_more = self.params.get_bool("AvoidLKASFaultBeyond")
+    self.no_mdps_mods = self.params.get_bool("NoSmartMDPS")
 
     self.radar_disabled_conf = self.params.get_bool("RadarDisable")
     self.prev_cruiseButton = 0
@@ -192,7 +193,7 @@ class CarController():
     elif CP.lateralTuning.which() == 'lqr':
       self.str_log2 = 'T={:04.0f}/{:05.3f}/{:07.5f}'.format(CP.lateralTuning.lqr.scale, CP.lateralTuning.lqr.ki, CP.lateralTuning.lqr.dcGain)
     elif CP.lateralTuning.which() == 'torque':
-      self.str_log2 = 'T={:0.2f}/{:0.2f}/{:0.2f}/{:0.2f}'.format(CP.lateralTuning.torque.kp, CP.lateralTuning.torque.kf, CP.lateralTuning.torque.ki, CP.lateralTuning.torque.friction)
+      self.str_log2 = 'T={:0.2f}/{:0.2f}/{:0.2f}/{:0.3f}'.format(CP.lateralTuning.torque.kp, CP.lateralTuning.torque.kf, CP.lateralTuning.torque.ki, CP.lateralTuning.torque.friction)
 
     self.sm = messaging.SubMaster(['controlsState', 'radarState', 'longitudinalPlan'])
 
@@ -309,6 +310,8 @@ class CarController():
       if self.driver_steering_torque_above_timer >= 100:
         self.driver_steering_torque_above_timer = 100
 
+    if self.no_mdps_mods and CS.out.vEgo < CS.CP.minSteerSpeed:
+      lkas_active = False
     if not lkas_active:
       apply_steer = 0
 
@@ -734,7 +737,7 @@ class CarController():
             elif aReqValue > 0.0:
               accel = interp(CS.lead_distance, [14.0, 15.0], [max(accel, aReqValue, faccel), aReqValue])
             elif aReqValue < 0.0 and CS.lead_distance <= 4.2 and accel >= aReqValue and lead_objspd <= 0 and self.stopping_dist_adj_enabled:
-              accel = self.accel - (DT_CTRL * interp(CS.out.vEgo, [0.9, 3.0], [1.0, 3.0-(0.5*(3.0-CS.cruiseGapSet))]))
+              accel = self.accel - (DT_CTRL * interp(CS.out.vEgo, [1.0, 4.0], [1.0, 3.0-(0.5*(3.0-CS.cruiseGapSet))]))
             elif aReqValue < 0.0 and lead_objspd <= -15:
               accel = interp(abs(lead_objspd), [15.0, 30.0], [(accel + aReqValue)/2, min(accel, aReqValue)])
             elif aReqValue < 0.0 and self.stopping_dist_adj_enabled:
@@ -847,9 +850,9 @@ class CarController():
            float(Decimal(self.params.get("LqrKi", encoding="utf8"))*Decimal('0.001')), float(Decimal(self.params.get("DcGain", encoding="utf8"))*Decimal('0.00001')))
         elif CS.CP.lateralTuning.which() == 'torque':
           max_lat_accel = float(Decimal(self.params.get("TorqueMaxLatAccel", encoding="utf8"))*Decimal('0.1'))
-          self.str_log2 = 'T={:0.2f}/{:0.2f}/{:0.2f}/{:0.2f}'.format(float(Decimal(self.params.get("TorqueKp", encoding="utf8"))*Decimal('0.1'))/max_lat_accel, \
+          self.str_log2 = 'T={:0.2f}/{:0.2f}/{:0.2f}/{:0.3f}'.format(float(Decimal(self.params.get("TorqueKp", encoding="utf8"))*Decimal('0.1'))/max_lat_accel, \
            float(Decimal(self.params.get("TorqueKf", encoding="utf8"))*Decimal('0.1'))/max_lat_accel, float(Decimal(self.params.get("TorqueKi", encoding="utf8"))*Decimal('0.1'))/max_lat_accel, \
-           float(Decimal(self.params.get("TorqueFriction", encoding="utf8")) * Decimal('0.01')))
+           float(Decimal(self.params.get("TorqueFriction", encoding="utf8")) * Decimal('0.001')))
 
     trace1.printf1('{}  {}'.format(str_log1, self.str_log2))
 

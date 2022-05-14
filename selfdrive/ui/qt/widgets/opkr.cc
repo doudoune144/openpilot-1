@@ -42,8 +42,10 @@ SwitchOpenpilot::SwitchOpenpilot() : ButtonControl("Change Repo/Branch", "", "Ch
               QString as = a.toString(time_format);
               QString cmd1 = "mv /data/openpilot /data/openpilot_" + as;
               QString cmd2 = "git clone -b " + githubbranch + " --single-branch https://github.com/" + githubid + "/" + githubrepo + ".git /data/openpilot";
+              QString cmd3 = "rm -f /data/openpilot_" + as + "/prebuilt";
               QProcess::execute("pkill -f thermald");
               QProcess::execute(cmd1);
+              QProcess::execute(cmd3);
               QProcess::execute(cmd2);
               QProcess::execute("chmod -R g-rwx /data/openpilot");
               QProcess::execute("chmod -R o-rwx /data/openpilot");
@@ -2130,7 +2132,7 @@ void AutoResLimitTime::refresh() {
   btnplus.setText("+");
 }
 
-AutoEnableSpeed::AutoEnableSpeed() : AbstractControl("Auto Engage Speed(km/h)", "Set the automatic engage speed.", "../assets/offroad/icon_shell.png") {
+AutoEnableSpeed::AutoEnableSpeed() : AbstractControl("Auto Engage Spd(kph)", "Set the automatic engage speed.", "../assets/offroad/icon_shell.png") {
 
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
@@ -2161,8 +2163,8 @@ AutoEnableSpeed::AutoEnableSpeed() : AbstractControl("Auto Engage Speed(km/h)", 
     auto str = QString::fromStdString(params.get("AutoEnableSpeed"));
     int value = str.toInt();
     value = value - 3;
-    if (value <= 0) {
-      value = 0;
+    if (value <= -3) {
+      value = -3;
     }
     QString values = QString::number(value);
     params.put("AutoEnableSpeed", values.toStdString());
@@ -2185,7 +2187,9 @@ AutoEnableSpeed::AutoEnableSpeed() : AbstractControl("Auto Engage Speed(km/h)", 
 
 void AutoEnableSpeed::refresh() {
   QString option = QString::fromStdString(params.get("AutoEnableSpeed"));
-  if (option == "0") {
+  if (option == "-3") {
+    label.setText(QString::fromStdString("atDGear"));
+  } else if (option == "0") {
     label.setText(QString::fromStdString("atDepart"));
   } else {
     label.setText(QString::fromStdString(params.get("AutoEnableSpeed")));
@@ -4513,7 +4517,7 @@ TorqueFriction::TorqueFriction() : AbstractControl("Friction", "Adjust Friction"
   QObject::connect(&btnminus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("TorqueFriction"));
     int value = str.toInt();
-    value = value - 1;
+    value = value - 5;
     if (value <= 0) {
       value = 0;
     }
@@ -4525,9 +4529,9 @@ TorqueFriction::TorqueFriction() : AbstractControl("Friction", "Adjust Friction"
  QObject::connect(&btnplus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("TorqueFriction"));
     int value = str.toInt();
-    value = value + 1;
-    if (value >= 30) {
-      value = 30;
+    value = value + 5;
+    if (value >= 300) {
+      value = 300;
     }
     QString values = QString::number(value);
     params.put("TorqueFriction", values.toStdString());
@@ -4539,7 +4543,7 @@ TorqueFriction::TorqueFriction() : AbstractControl("Friction", "Adjust Friction"
 void TorqueFriction::refresh() {
   auto strs = QString::fromStdString(params.get("TorqueFriction"));
   int valuei = strs.toInt();
-  float valuef = valuei * 0.01;
+  float valuef = valuei * 0.001;
   QString valuefs = QString::number(valuef);
   label.setText(QString::fromStdString(valuefs.toStdString()));
 }
@@ -5271,7 +5275,7 @@ VCurvSpeed::VCurvSpeed() : AbstractControl("", "", "") {
   QObject::connect(&btn, &QPushButton::clicked, [=]() {
     int list_count1 = 0;
     int list_count2 = 0;
-    QString targetvalue1 = InputDialog::getText("Set CV values with comma", this, "ex) 30,50,70,90,110", false, 1, QString::fromStdString(params.get("VCurvSpeedC")));
+    QString targetvalue1 = InputDialog::getText("Set CV values with comma", this, "Values are kph or mph", false, 1, QString::fromStdString(params.get("VCurvSpeedC")));
     if (targetvalue1.length() > 0 && targetvalue1 != QString::fromStdString(params.get("VCurvSpeedC"))) {
       QStringList list1 = targetvalue1.split(",");
       list_count1 = list1.size();
@@ -5281,7 +5285,7 @@ VCurvSpeed::VCurvSpeed() : AbstractControl("", "", "") {
       QStringList list1 = QString::fromStdString(params.get("VCurvSpeedC")).split(",");
       list_count1 = list1.size();
     }
-    QString targetvalue2 = InputDialog::getText("Set TS values with comma", this, "ex) 45,55,65,75,85", false, 1, QString::fromStdString(params.get("VCurvSpeedT")));
+    QString targetvalue2 = InputDialog::getText("Set TS values with comma", this, "CV: " + QString::fromStdString(params.get("VCurvSpeedC")), false, 1, QString::fromStdString(params.get("VCurvSpeedT")));
     if (targetvalue2.length() > 0 && targetvalue2 != QString::fromStdString(params.get("VCurvSpeedT"))) {
       QStringList list2 = targetvalue2.split(",");
       list_count2 = list2.size();
@@ -5341,7 +5345,7 @@ OCurvSpeed::OCurvSpeed() : AbstractControl("", "", "") {
   QObject::connect(&btn, &QPushButton::clicked, [=]() {
     int list_count1 = 0;
     int list_count2 = 0;
-    QString targetvalue1 = InputDialog::getText("Set TSL values with comma", this, "ex) 30,40,50,60,70", false, 1, QString::fromStdString(params.get("OCurvSpeedC")));
+    QString targetvalue1 = InputDialog::getText("Set TSL values with comma", this, "Valus are TSL", false, 1, QString::fromStdString(params.get("OCurvSpeedC")));
     if (targetvalue1.length() > 0 && targetvalue1 != QString::fromStdString(params.get("OCurvSpeedC"))) {
       QStringList list1 = targetvalue1.split(",");
       list_count1 = list1.size();
@@ -5351,7 +5355,7 @@ OCurvSpeed::OCurvSpeed() : AbstractControl("", "", "") {
       QStringList list1 = QString::fromStdString(params.get("OCurvSpeedC")).split(",");
       list_count1 = list1.size();
     }
-    QString targetvalue2 = InputDialog::getText("Set TS values with comma", this, "ex) 35,45,60,70,80", false, 1, QString::fromStdString(params.get("OCurvSpeedT")));
+    QString targetvalue2 = InputDialog::getText("Set TS values with comma", this, "TSL: " + QString::fromStdString(params.get("OCurvSpeedC")), false, 1, QString::fromStdString(params.get("OCurvSpeedT")));
     if (targetvalue2.length() > 0 && targetvalue2 != QString::fromStdString(params.get("OCurvSpeedT"))) {
       QStringList list2 = targetvalue2.split(",");
       list_count2 = list2.size();
@@ -6126,8 +6130,8 @@ AutoRESDelay::AutoRESDelay() : AbstractControl("AutoRES Delay(sec)", "Give delay
     auto str = QString::fromStdString(params.get("AutoRESDelay"));
     int value = str.toInt();
     value = value + 1;
-    if (value >= 10) {
-      value = 10;
+    if (value >= 20) {
+      value = 20;
     }
     QString values = QString::number(value);
     params.put("AutoRESDelay", values.toStdString());
@@ -6182,7 +6186,7 @@ OSMCustomSpeedLimit::OSMCustomSpeedLimit() : AbstractControl("", "", "") {
   QObject::connect(&btn, &QPushButton::clicked, [=]() {
     int list_count1 = 0;
     int list_count2 = 0;
-    QString targetvalue1 = InputDialog::getText("Set SL values with comma", this, "ex) 30,40,50,60,70,90", false, 1, QString::fromStdString(params.get("OSMCustomSpeedLimitC")));
+    QString targetvalue1 = InputDialog::getText("Set SL values with comma", this, "Values are kph or mph", false, 1, QString::fromStdString(params.get("OSMCustomSpeedLimitC")));
     if (targetvalue1.length() > 0 && targetvalue1 != QString::fromStdString(params.get("OSMCustomSpeedLimitC"))) {
       QStringList list1 = targetvalue1.split(",");
       list_count1 = list1.size();
@@ -6192,7 +6196,7 @@ OSMCustomSpeedLimit::OSMCustomSpeedLimit() : AbstractControl("", "", "") {
       QStringList list1 = QString::fromStdString(params.get("OSMCustomSpeedLimitC")).split(",");
       list_count1 = list1.size();
     }
-    QString targetvalue2 = InputDialog::getText("Set CTSL values with comma", this, "ex) 30,40,65,72,80,95", false, 1, QString::fromStdString(params.get("OSMCustomSpeedLimitT")));
+    QString targetvalue2 = InputDialog::getText("Set CTSL values with comma", this, "SL: " + QString::fromStdString(params.get("OSMCustomSpeedLimitC")), false, 1, QString::fromStdString(params.get("OSMCustomSpeedLimitT")));
     if (targetvalue2.length() > 0 && targetvalue2 != QString::fromStdString(params.get("OSMCustomSpeedLimitT"))) {
       QStringList list2 = targetvalue2.split(",");
       list_count2 = list2.size();
@@ -6350,7 +6354,7 @@ DynamicTRBySpeed::DynamicTRBySpeed() : AbstractControl("", "", "") {
   QObject::connect(&btn, &QPushButton::clicked, [=]() {
     int list_count1 = 0;
     int list_count2 = 0;
-    QString targetvalue1 = InputDialog::getText("Set Speed values with comma", this, "ex) 0,20,40,60,110", false, 1, QString::fromStdString(params.get("DynamicTRSpd")));
+    QString targetvalue1 = InputDialog::getText("Set Speed values with comma", this, "Values are kph or mph", false, 1, QString::fromStdString(params.get("DynamicTRSpd")));
     if (targetvalue1.length() > 0 && targetvalue1 != QString::fromStdString(params.get("DynamicTRSpd"))) {
       QStringList list1 = targetvalue1.split(",");
       list_count1 = list1.size();
@@ -6360,7 +6364,7 @@ DynamicTRBySpeed::DynamicTRBySpeed() : AbstractControl("", "", "") {
       QStringList list1 = QString::fromStdString(params.get("DynamicTRSpd")).split(",");
       list_count1 = list1.size();
     }
-    QString targetvalue2 = InputDialog::getText("Set TR values with comma", this, "ex) 1.2,1.3,1.4,1.5,1.6", false, 1, QString::fromStdString(params.get("DynamicTRSet")));
+    QString targetvalue2 = InputDialog::getText("Set TR values with comma", this, "SPD: " + QString::fromStdString(params.get("DynamicTRSpd")), false, 1, QString::fromStdString(params.get("DynamicTRSet")));
     if (targetvalue2.length() > 0 && targetvalue2 != QString::fromStdString(params.get("DynamicTRSet"))) {
       QStringList list2 = targetvalue2.split(",");
       list_count2 = list2.size();
@@ -6483,7 +6487,7 @@ SpeedLaneWidth::SpeedLaneWidth() : AbstractControl("", "", "") {
   QObject::connect(&btn, &QPushButton::clicked, [=]() {
     int list_count1 = 0;
     int list_count2 = 0;
-    QString targetvalue1 = InputDialog::getText("Set Speed(m/s) values with comma", this, "ex) 0,31", false, 1, QString::fromStdString(params.get("SpdLaneWidthSpd")));
+    QString targetvalue1 = InputDialog::getText("Set Speed(m/s) values with comma", this, "Values are m/s unit.", false, 1, QString::fromStdString(params.get("SpdLaneWidthSpd")));
     if (targetvalue1.length() > 0 && targetvalue1 != QString::fromStdString(params.get("SpdLaneWidthSpd"))) {
       QStringList list1 = targetvalue1.split(",");
       list_count1 = list1.size();
@@ -6493,7 +6497,7 @@ SpeedLaneWidth::SpeedLaneWidth() : AbstractControl("", "", "") {
       QStringList list1 = QString::fromStdString(params.get("SpdLaneWidthSpd")).split(",");
       list_count1 = list1.size();
     }
-    QString targetvalue2 = InputDialog::getText("Set LW(m) values with comma", this, "ex) 2.8,3.5", false, 1, QString::fromStdString(params.get("SpdLaneWidthSet")));
+    QString targetvalue2 = InputDialog::getText("Set LW(m) values with comma", this, "SPD: " + QString::fromStdString(params.get("SpdLaneWidthSpd")), false, 1, QString::fromStdString(params.get("SpdLaneWidthSet")));
     if (targetvalue2.length() > 0 && targetvalue2 != QString::fromStdString(params.get("SpdLaneWidthSet"))) {
       QStringList list2 = targetvalue2.split(",");
       list_count2 = list2.size();
@@ -6984,4 +6988,41 @@ RPMAnimatedMaxValue::RPMAnimatedMaxValue() : AbstractControl("AnimatedRPM Max", 
 
 void RPMAnimatedMaxValue::refresh() {
   label.setText(QString::fromStdString(params.get("AnimatedRPMMax")));
+}
+
+UserSpecificFeature::UserSpecificFeature() : AbstractControl("FeatureNumber", "User Specific Feature", "") {
+  btn.setStyleSheet(R"(
+    padding: -10;
+    border-radius: 35px;
+    font-size: 35px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  edit.setStyleSheet(R"(
+    background-color: grey;
+    font-size: 55px;
+    font-weight: 500;
+    height: 120px;
+  )");
+  btn.setFixedSize(150, 100);
+  edit.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
+
+  hlayout->addWidget(&edit);
+  hlayout->addWidget(&btn);
+
+  QObject::connect(&btn, &QPushButton::clicked, [=]() {
+    QString targetvalue = InputDialog::getText("User Specific Features", this, "Put your number you know.", false, 1, QString::fromStdString(params.get("UserSpecificFeature")));
+    if (targetvalue.length() > 0 && targetvalue != QString::fromStdString(params.get("UserSpecificFeature"))) {
+      params.put("UserSpecificFeature", targetvalue.toStdString());
+      refresh();
+    }
+   });
+  refresh();
+}
+
+void UserSpecificFeature::refresh() {
+  auto strs = QString::fromStdString(params.get("UserSpecificFeature"));
+  edit.setText(QString::fromStdString(strs.toStdString()));
+  btn.setText("SET");
 }
