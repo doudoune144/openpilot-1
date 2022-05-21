@@ -235,6 +235,7 @@ struct CarState {
   isMph @53 :Bool;
   aReqValue @54 :Float32;
   engineRpm @55 :Float32;
+  chargeMeter @56 :Float32;
 
   struct TPMS {
     unit @0 :Int8;

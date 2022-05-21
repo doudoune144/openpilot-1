@@ -555,7 +555,7 @@ UIPanel::UIPanel(QWidget *parent) : QFrame(parent) {
     }
   });
   layout->addWidget(recorddelbtn);
-  const char* realdata_del = "rm -rf /storage/emulated/0/realdata/*";
+  const char* realdata_del = "rm -rf /data/media/0/realdata/*";
   auto realdatadelbtn = new ButtonControl("Delete All Driving Logs", "RUN");
   QObject::connect(realdatadelbtn, &ButtonControl::clicked, [=]() {
     if (ConfirmationDialog::confirm("Delete all saved driving logs. Do you want to proceed?", this)){

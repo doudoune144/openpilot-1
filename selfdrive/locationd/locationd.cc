@@ -504,7 +504,7 @@ int Localizer::locationd_thread() {
     sm.update();
     if (filterInitialized){
       for (const char* service : service_list) {
-        if (sm.updated(service) && sm.valid(service)){
+        if (sm.updated(service)){
           const cereal::Event::Reader log = sm[service];
           this->handle_msg(log);
         }

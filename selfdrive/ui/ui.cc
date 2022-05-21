@@ -199,6 +199,7 @@ static void update_state(UIState *s) {
     scene.a_req_value = cs_data.getAReqValue();
     scene.engine_rpm = cs_data.getEngineRpm();
     scene.gear_step = cs_data.getGearStep();
+    scene.charge_meter = cs_data.getChargeMeter();
   }
 
   if (sm.updated("liveParameters")) {

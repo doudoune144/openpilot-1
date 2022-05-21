@@ -1013,7 +1013,7 @@ void ChargingMax::refresh() {
   label.setText(QString::fromStdString(params.get("OpkrBatteryChargingMax")));
 }
 
-RecordCount::RecordCount() : AbstractControl("Number of Recorded Files", "Sets the maximum number of recording files.", "../assets/offroad/icon_shell.png") {
+RecordCount::RecordCount() : AbstractControl("Number of Recorded Files", "Sets the maximum number of recording files. Check file size and max recording count to not exceed your storage.", "../assets/offroad/icon_shell.png") {
 
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
@@ -1045,9 +1045,9 @@ RecordCount::RecordCount() : AbstractControl("Number of Recorded Files", "Sets t
   QObject::connect(&btnminus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("RecordingCount"));
     int value = str.toInt();
-    value = value - 5;
-    if (value <= 5) {
-      value = 5;
+    value = value - 10;
+    if (value <= 10) {
+      value = 10;
     }
     QString values = QString::number(value);
     params.put("RecordingCount", values.toStdString());
@@ -1057,9 +1057,9 @@ RecordCount::RecordCount() : AbstractControl("Number of Recorded Files", "Sets t
   QObject::connect(&btnplus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("RecordingCount"));
     int value = str.toInt();
-    value = value + 5;
-    if (value >= 300) {
-      value = 300;
+    value = value + 10;
+    if (value >= 1000) {
+      value = 1000;
     }
     QString values = QString::number(value);
     params.put("RecordingCount", values.toStdString());

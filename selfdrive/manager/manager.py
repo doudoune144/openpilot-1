@@ -123,7 +123,7 @@ def manager_init() -> None:
     ("MaxRateUp", "3"),
     ("MaxRateDown", "7"),
     ("SteerThreshold", "150"),
-    ("RecordingCount", "100"),
+    ("RecordingCount", "200"),
     ("RecordingQuality", "1"),
     ("CruiseGapAdjust", "0"),
     ("AutoEnable", "1"),

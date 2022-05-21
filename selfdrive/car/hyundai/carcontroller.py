@@ -322,6 +322,11 @@ class CarController():
       self.need_brake_timer += 1
       if self.need_brake_timer > 50:
         self.need_brake = True
+    elif not CS.cruise_active and 1 < self.dRel < (CS.out.vEgo * CV.MS_TO_KPH * 0.6) < 12 and self.vRel*3.6 < -(CS.out.vEgo * CV.MS_TO_KPH * 0.7) and \
+     5 < (CS.out.vEgo * CV.MS_TO_KPH) < 20 and not (CS.out.brakeLights or CS.out.brakePressed or CS.out.gasPressed): # generate an event to avoid collision when SCC is not activated at low speed.
+      self.need_brake_timer += 1
+      if self.need_brake_timer > 25:
+        self.need_brake = True
     else:
       self.need_brake = False
       self.need_brake_timer = 0
