@@ -32,10 +32,10 @@ class LatTunes(Enum):
 def set_long_tune(tune, name):
   # Improved longitudinal tune
   if name == LongTunes.OPKR:
-    tune.kpBP = [0., 4., 9., 17., 23., 31.]
-    tune.kpV = [1.2, 1.1, 1.0, 0.9, 0.75, 0.65]
-    tune.kiBP = [0., 4., 9., 17., 23., 31.]
-    tune.kiV = [0.27, 0.24, 0.23, 0.2, 0.17, 0.15]
+    tune.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
+    tune.kpV = [0.3, 0.7, 1.37, 1.18, 1.11, 1.05, 1]
+    tune.kiBP = [0., 20.* CV.KPH_TO_MS, 80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
+    tune.kiV = [0.01, 0.05, 0.05, 0.04, 0.03]
     tune.deadzoneBP = [0., 4.]
     tune.deadzoneV = [0., 0.1]
     tune.kdBP = [0., 4., 9., 17., 23., 31.]
