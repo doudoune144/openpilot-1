@@ -99,6 +99,7 @@ struct ModelOutputLinesProb {
 };
 static_assert(sizeof(ModelOutputLinesProb) == sizeof(ModelOutputLineProbVal)*4);
 
+
 struct ModelOutputLaneLines {
   ModelOutputLinesXY mean;
   ModelOutputLinesXY std;

@@ -258,7 +258,7 @@ class NaviControl():
         else:
           self.onSpeedControl = False
       elif CS.safety_sign > 19 and self.stock_navi_info_enabled:  # cat stock navi speedlimit
-        self.map_speed_dist = max(0, CS.safety_dist - 30)
+        self.map_speed_dist = max(0, CS.safety_dist - int(interp(CS.safety_sign, [30,110], [20,70])))
         self.map_speed = CS.safety_sign
         if CS.safety_block_sl < 150:
           self.map_speed_block = True
@@ -352,9 +352,9 @@ class NaviControl():
         if self.cut_in_run_timer > 0:
           self.cut_in_run_timer -= 1
         elif self.cut_in:
-          self.cut_in_run_timer = 800
-        if self.cut_in_run_timer and dRel < CS.clu_Vanz * 0.4: # keep decel when cut_in, max running time 8sec
-          var_speed = min(CS.CP.vFuture, navi_speed)
+          self.cut_in_run_timer = 1000
+        if self.cut_in_run_timer and dRel < CS.clu_Vanz * 0.36: # keep decel when cut_in, max running time 10sec
+          var_speed = min(CS.CP.vFutureA, navi_speed)
         elif vRel >= (-3 if CS.is_set_speed_in_mph else -5):
           var_speed = min(CS.CP.vFuture + max(0, int(dRel*(0.1 if CS.is_set_speed_in_mph else 0.15)+vRel)), navi_speed)
           ttime = 100 if CS.is_set_speed_in_mph else 70

@@ -1515,6 +1515,7 @@ BO_ 865 ADAS_PRK_11: 8 ADAS_PRK
 
 BO_ 882 ELECT_GEAR: 8 XXX
  SG_ Elect_Gear_Shifter : 16|4@1+ (1,0) [0|7] ""  CLU
+ SG_ Elect_Gear_Shifter_NEXO : 16|16@1+ (1,0) [0|65535] ""  CLU
  SG_ Elect_Gear_Step : 22|3@0+ (1,0) [0|7] "" XXX
  SG_ Elect_Motor_Speed : 0|8@1+ (1,0) [0|255] "" XXX
 
@@ -1535,6 +1536,7 @@ BO_ 1355 EV_PC6: 8 CGW
 
 BO_ 1430 EV_PC2: 8 CGW
  SG_ CR_Ldc_ActVol_LS_V : 32|8@1+ (0.1,0) [0|0] "V" Vector__XXX
+ SG_ NEW_SIGNAL_1 : 8|7@1+ (1,0) [0|100] "%" XXX
 
 BO_ 1535 EV_PC10: 8 CGW
  SG_ CF_Vcu_EpbRequest : 37|1@1+ (1,0) [0|0] "" Vector__XXX

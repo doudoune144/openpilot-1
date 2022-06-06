@@ -1,5 +1,7 @@
 #include "selfdrive/ui/qt/widgets/controls.h"
 
+#include <cmath>
+#include <cstdlib>
 #include <QPainter>
 #include <QStyleOption>
 
@@ -72,9 +74,111 @@ void AbstractControl::hideEvent(QHideEvent *e) {
   }
 }
 
-// controls
+//  MenuControl
 
-ButtonControl::ButtonControl(const QString &title, const QString &text, const QString &desc, QWidget *parent) : AbstractControl(title, desc, "", parent) {
+MenuControl::MenuControl( const QString &str_param, const QString &title, const QString &desc, const QString &icon, QWidget *parent ) 
+  : AbstractControl( title, desc, icon, parent )
+{
+  m_nDelta = 10;
+  m_nMax = 100;
+  m_nMin = 0;
+  m_nValue = 0;
+
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  auto str = QString::fromStdString( params.get( str_param.toStdString() ) );
+  float value = str.toDouble();
+  m_dValue = value;
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 35px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+
+  btnminus.setFixedSize(150, 100);
+  btnminus.setText("－");
+  hlayout->addWidget(&btnminus);
+  
+  QObject::connect(&btnminus, &QPushButton::clicked, [=]() {
+    m_dValue -= m_nDelta;
+    if (m_dValue < m_nMin) {
+      m_dValue = m_nMin;
+    }
+    QString values = QString::number(m_dValue);
+    params.put( str_param.toStdString() , values.toStdString());
+
+    refresh();
+  });
+
+
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 35px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setFixedSize(150, 100);
+  btnplus.setText("＋");
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnplus, &QPushButton::clicked, [=]() {
+    m_dValue += m_nDelta;
+    if (m_dValue > m_nMax) {
+      m_dValue = m_nMax;
+    }
+    QString values = QString::number(m_dValue);
+    params.put( str_param.toStdString(), values.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void MenuControl::refresh() 
+{
+  QString values = QString::number( m_dValue );
+
+  int count = m_strList.size();
+  if( count > 0 )
+  {
+    int  nMenu = m_dValue;
+    
+    if( 0 <= nMenu && nMenu <= count )
+      values = m_strList[nMenu];
+  }
+  else if( !m_strValue.isEmpty() )
+  {
+   // float  fDelta = std::abs(m_nValue - m_dValue);
+   // printf( "MenuControl %f  %f \n", m_nValue, fDelta);
+    if( m_nValue == m_dValue  )
+        values = m_strValue;
+  }
+
+
+  label.setText( values );
+}
+
+void MenuControl::SetString( const QString strList )
+{
+  m_strList = strList.split(",");
+}
+
+void MenuControl::SetString( float nValue, const QString str )
+{
+  m_nValue = nValue;
+  m_strValue = str;
+}
+
+// controls
+ButtonControl::ButtonControl( const QString &title, const QString &text, const QString &desc, QWidget *parent) 
+  : AbstractControl(title, desc, "", parent) {
   btn.setText(text);
   btn.setStyleSheet(R"(
     QPushButton {
@@ -96,6 +200,8 @@ ButtonControl::ButtonControl(const QString &title, const QString &text, const QS
   QObject::connect(&btn, &QPushButton::clicked, this, &ButtonControl::clicked);
   hlayout->addWidget(&btn);
 }
+
+
 
 // ElidedLabel
 

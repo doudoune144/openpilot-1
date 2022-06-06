@@ -52,6 +52,15 @@ class CarInterface(CarInterfaceBase):
     ret.openpilotLongitudinalControl = Params().get_bool("RadarDisable") or ret.sccBus == 2
     ret.safetyParam = 0
 
+
+
+    ret.smoothSteer.method = int( Params().get("OpkrSteerMethod", encoding="utf8") )   # 1
+    ret.smoothSteer.maxSteeringAngle = float( Params().get("OpkrMaxSteeringAngle", encoding="utf8") )   # 90
+    ret.smoothSteer.maxDriverAngleWait = float( Params().get("OpkrMaxDriverAngleWait", encoding="utf8") )  # 0.002
+    ret.smoothSteer.maxSteerAngleWait = float( Params().get("OpkrMaxSteerAngleWait", encoding="utf8") )   # 0.001  # 10 sec
+    ret.smoothSteer.driverAngleWait = float( Params().get("OpkrDriverAngleWait", encoding="utf8") )  #0.001
+    #ret.steeringPressed
+    #ret.maxSteeringAngleDeg = 90
     ret.minSteerSpeed = 16.67 # m/s
 
     # Most Hyundai car ports are community features for now
@@ -62,17 +71,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerLimitTimer = 0.8
     tire_stiffness_factor = 0.7
 
-    ret.longitudinalTuning.kpBP = [0, 10. * CV.KPH_TO_MS, 20. * CV.KPH_TO_MS, 40. * CV.KPH_TO_MS, 70. * CV.KPH_TO_MS, 100. * CV.KPH_TO_MS, 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [0.3, 0.7, 1.37, 1.18, 1.11, 1.05, 1]
-    ret.longitudinalTuning.kiBP = [0., 20.* CV.KPH_TO_MS, 80.* CV.KPH_TO_MS, 100.* CV.KPH_TO_MS, 130.* CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.01, 0.05, 0.05, 0.04, 0.03]
-
-    ret.longitudinalTuning.deadzoneBP = [0., 4.]
-    ret.longitudinalTuning.deadzoneV = [0., 0.1]
-    ret.longitudinalTuning.kdBP = [0., 4., 9., 17., 23., 31.]
-    ret.longitudinalTuning.kdV = [0.9, 1.0, 0.85, 0.7, 0.5, 0.4]
-    ret.longitudinalTuning.kfBP = [0., 4., 9., 17., 23., 31.]
-    ret.longitudinalTuning.kfV = [1., 1., 1., 1., 1., 1.]
+    set_long_tune(ret.longitudinalTuning, LongTunes.OPKR)
 
     ret.stoppingControl = False
     ret.vEgoStopping = 0.5  # 1.0, 0.5
@@ -86,11 +85,11 @@ class CarInterface(CarInterfaceBase):
     ret.vCruisekph = 0
     ret.resSpeed = 0
     ret.vFuture = 0
+    ret.vFutureA = 0
     ret.aqValue = 0
     ret.aqValueRaw = 0
 
     params = Params()
-
     tire_stiffness_factor = float(Decimal(params.get("TireStiffnessFactorAdj", encoding="utf8")) * Decimal('0.01'))
     ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
     ret.steerRateCost = float(Decimal(params.get("SteerRateCostAdj", encoding="utf8")) * Decimal('0.01'))
@@ -106,95 +105,142 @@ class CarInterface(CarInterfaceBase):
       set_lat_tune(ret.lateralTuning, LatTunes.LQR)
     elif lat_control_method == 3:
       set_lat_tune(ret.lateralTuning, LatTunes.TORQUE)
+    elif lat_control_method == 4:
+      set_lat_tune(ret.lateralTuning, LatTunes.ATOM)    # Hybrid tune  
 
     # genesis
-    if candidate == CAR.GENESIS:
-      ret.mass = 1900. + STD_CARGO_KG
+    if candidate == CAR.GENESIS_DH:
+      ret.mass = 1930. + STD_CARGO_KG
       ret.wheelbase = 3.01
-    elif candidate == CAR.GENESIS_G70:
-      ret.mass = 1640. + STD_CARGO_KG
-      ret.wheelbase = 2.84
-    elif candidate == CAR.GENESIS_G80:
+    elif candidate == CAR.GENESIS_G70_IK:
+      ret.mass = 1595. + STD_CARGO_KG
+      ret.wheelbase = 2.835
+    elif candidate == CAR.GENESIS_G80_DH:
       ret.mass = 1855. + STD_CARGO_KG
       ret.wheelbase = 3.01
-    elif candidate == CAR.GENESIS_G90:
-      ret.mass = 2200
-      ret.wheelbase = 3.15
+    elif candidate == CAR.GENESIS_G90_HI:
+      ret.mass = 2120. + STD_CARGO_KG
+      ret.wheelbase = 3.16
+    elif candidate == CAR.GENESIS_EQ900_HI:
+      ret.mass = 2130. + STD_CARGO_KG
+      ret.wheelbase = 3.16
     # hyundai
-    elif candidate == CAR.SANTA_FE:
-      ret.mass = 1694 + STD_CARGO_KG
+    elif candidate == CAR.SANTAFE_TM:
+      ret.mass = 1694. + STD_CARGO_KG
       ret.wheelbase = 2.765
-    elif candidate in (CAR.SONATA, CAR.SONATA_HEV):
-      ret.mass = 1513. + STD_CARGO_KG
+    elif candidate == CAR.SANTAFE_HEV_TM:
+      ret.mass = 1907. + STD_CARGO_KG
+      ret.wheelbase = 2.765
+    elif candidate == CAR.SONATA_DN8:
+      ret.mass = 1465. + STD_CARGO_KG
+      ret.wheelbase = 2.84
+    elif candidate == CAR.SONATA_HEV_DN8:
+      ret.mass = 1505. + STD_CARGO_KG
       ret.wheelbase = 2.84
     elif candidate == CAR.SONATA_LF:
-      ret.mass = 4497. * CV.LB_TO_KG
-      ret.wheelbase = 2.804
-    elif candidate == CAR.SONATA_LF_TURBO:
+      ret.mass = 1465. + STD_CARGO_KG
+      ret.wheelbase = 2.805
+    elif candidate == CAR.SONATA_TURBO_LF:
       ret.mass = 1470. + STD_CARGO_KG
       ret.wheelbase = 2.805
-    elif candidate == CAR.SONATA_LF_HEV:
+    elif candidate == CAR.SONATA_HEV_LF:
       ret.mass = 1595. + STD_CARGO_KG
       ret.wheelbase = 2.805
-    elif candidate == CAR.PALISADE:
-      ret.mass = 1999. + STD_CARGO_KG
+    elif candidate == CAR.PALISADE_LX2:
+      ret.mass = 1885. + STD_CARGO_KG
       ret.wheelbase = 2.90
-    elif candidate == CAR.AVANTE:
-      ret.mass = 1245. + STD_CARGO_KG
+    elif candidate == CAR.AVANTE_AD:
+      ret.mass = 1250. + STD_CARGO_KG
+      ret.wheelbase = 2.7
+    elif candidate == CAR.AVANTE_CN7:
+      ret.mass = 1225. + STD_CARGO_KG
       ret.wheelbase = 2.72
-    elif candidate == CAR.I30:
+    elif candidate == CAR.AVANTE_HEV_CN7:
+      ret.mass = 1335. + STD_CARGO_KG
+      ret.wheelbase = 2.72
+    elif candidate == CAR.I30_PD:
       ret.mass = 1380. + STD_CARGO_KG
       ret.wheelbase = 2.65
-    elif candidate == CAR.KONA:
-      ret.mass = 1275. + STD_CARGO_KG
-      ret.wheelbase = 2.7
-    elif candidate in (CAR.KONA_HEV, CAR.KONA_EV):
-      ret.mass = 1425. + STD_CARGO_KG
+    elif candidate == CAR.KONA_OS:
+      ret.mass = 1325. + STD_CARGO_KG
       ret.wheelbase = 2.6
-    elif candidate in (CAR.IONIQ_HEV, CAR.IONIQ_EV):
-      ret.mass = 1490. + STD_CARGO_KG   #weight per hyundai site https://www.hyundaiusa.com/ioniq-electric/specifications.aspx
+    elif candidate == CAR.KONA_HEV_OS:
+      ret.mass = 1395. + STD_CARGO_KG
+      ret.wheelbase = 2.6
+    elif candidate == CAR.KONA_EV_OS:
+      ret.mass = 1685. + STD_CARGO_KG
+      ret.wheelbase = 2.6
+    elif candidate == CAR.IONIQ_HEV_AE:
+      ret.mass = 1380. + STD_CARGO_KG
       ret.wheelbase = 2.7
-    elif candidate in (CAR.GRANDEUR_IG, CAR.GRANDEUR_IG_HEV):
+    elif candidate == CAR.IONIQ_EV_AE:
+      ret.mass = 1445. + STD_CARGO_KG
+      ret.wheelbase = 2.7
+    elif candidate == CAR.GRANDEUR_IG:
+      ret.mass = 1560. + STD_CARGO_KG
+      ret.wheelbase = 2.845
+    elif candidate == CAR.GRANDEUR_HEV_IG:
       ret.mass = 1675. + STD_CARGO_KG
       ret.wheelbase = 2.845
-    elif candidate in (CAR.GRANDEUR_IG_FL, CAR.GRANDEUR_IG_FL_HEV):
+    elif candidate == CAR.GRANDEUR_FL_IG:
+      ret.mass = 1625. + STD_CARGO_KG
+      ret.wheelbase = 2.885
+    elif candidate == CAR.GRANDEUR_HEV_FL_IG:
       ret.mass = 1675. + STD_CARGO_KG
       ret.wheelbase = 2.885
-    elif candidate == CAR.VELOSTER:
-      ret.mass = 3558. * CV.LB_TO_KG
-      ret.wheelbase = 2.80
-    elif candidate == CAR.NEXO:
+    elif candidate == CAR.VELOSTER_JS:
+      ret.mass = 1285. + STD_CARGO_KG
+      ret.wheelbase = 2.65
+    elif candidate == CAR.TUCSON_TL:
+      ret.mass = 1550. + STD_CARGO_KG
+      ret.wheelbase = 2.67
+    elif candidate == CAR.NEXO_FE:
       ret.mass = 1885. + STD_CARGO_KG
       ret.wheelbase = 2.79
     # kia
-    elif candidate == CAR.SORENTO:
-      ret.mass = 1985. + STD_CARGO_KG
+    elif candidate == CAR.KIA_FORTE:
+      ret.mass = 3558. * CV.LB_TO_KG
+      ret.wheelbase = 2.80
+    elif candidate == CAR.SORENTO_UM:
+      ret.mass = 1910. + STD_CARGO_KG
       ret.wheelbase = 2.78
-    elif candidate in (CAR.K5, CAR.K5_HEV):
+    elif candidate == CAR.K5_JF:
+      ret.wheelbase = 2.805
+      ret.mass = 1475. + STD_CARGO_KG
+    elif candidate == CAR.K5_HEV_JF:
       ret.wheelbase = 2.805
       ret.mass = 1600. + STD_CARGO_KG
-    elif candidate == CAR.STINGER:
-      ret.mass = 1825.0 + STD_CARGO_KG
-      ret.wheelbase = 2.906 # https://www.kia.com/us/en/stinger/specs
-    elif candidate == CAR.K3:
+    elif candidate == CAR.K5_DL3:
+      ret.wheelbase = 2.85
+      ret.mass = 1450. + STD_CARGO_KG
+    elif candidate == CAR.STINGER_CK:
+      ret.mass = 1650. + STD_CARGO_KG
+      ret.wheelbase = 2.905
+    elif candidate == CAR.K3_BD:
       ret.mass = 1260. + STD_CARGO_KG
       ret.wheelbase = 2.70
-    elif candidate == CAR.SPORTAGE:
-      ret.mass = 1985. + STD_CARGO_KG
-      ret.wheelbase = 2.78
-    elif candidate in (CAR.NIRO_HEV, CAR.NIRO_EV):
-      ret.mass = 1850. + STD_CARGO_KG
+    elif candidate == CAR.SPORTAGE_QL:
+      ret.mass = 1510. + STD_CARGO_KG
+      ret.wheelbase = 2.67
+    elif candidate == CAR.NIRO_HEV_DE:
+      ret.mass = 1425. + STD_CARGO_KG
       ret.wheelbase = 2.7
-    elif candidate in (CAR.K7, CAR.K7_HEV):
+    elif candidate == CAR.NIRO_EV_DE:
+      ret.mass = 1755. + STD_CARGO_KG
+      ret.wheelbase = 2.7
+    elif candidate == CAR.K7_YG:
+      ret.mass = 1565. + STD_CARGO_KG
+      ret.wheelbase = 2.855
+    elif candidate == CAR.K7_HEV_YG:
       ret.mass = 1680. + STD_CARGO_KG
       ret.wheelbase = 2.855
-    elif candidate == CAR.SELTOS:
-      ret.mass = 1310. + STD_CARGO_KG
+    elif candidate == CAR.SELTOS_SP2:
+      ret.mass = 1425. + STD_CARGO_KG
+      ret.wheelbase = 2.63
+    elif candidate == CAR.SOUL_EV_SK3:
+      ret.mass = 1695. + STD_CARGO_KG
       ret.wheelbase = 2.6
-    elif candidate == CAR.SOUL_EV:
-      ret.mass = 1375. + STD_CARGO_KG
-      ret.wheelbase = 2.6
-    elif candidate == CAR.MOHAVE:
+    elif candidate == CAR.MOHAVE_HM:
       ret.mass = 2285. + STD_CARGO_KG
       ret.wheelbase = 2.895
 
@@ -285,26 +331,27 @@ class CarInterface(CarInterfaceBase):
     #   events.events.remove(EventName.pedalPressed)
     if ret.vEgo < self.CP.minSteerSpeed and self.no_mdps_mods:
       events.add(car.CarEvent.EventName.belowSteerSpeed)
-    if self.CC.lanechange_manual_timer and ret.vEgo > 0.3:
-      events.add(EventName.laneChangeManual)
-    if self.CC.emergency_manual_timer:
-      events.add(EventName.emgButtonManual)
-    #if self.CC.driver_steering_torque_above_timer:
-    #  events.add(EventName.driverSteering)
     if self.CC.need_brake and not self.CC.longcontrol:
       events.add(EventName.needBrake)
-    if self.CC.standstill_res_button:
-      events.add(EventName.standstillResButton)
-    if self.CC.cruise_gap_adjusting:
-      events.add(EventName.gapAdjusting)
-    if self.CC.on_speed_control and ret.vEgo > 0.3:
-      events.add(EventName.camSpeedDown)
-    if self.CC.curv_speed_control and ret.vEgo > 8.3:
-      events.add(EventName.curvSpeedDown)
-    if self.CC.autohold_popup_timer:
-      events.add(EventName.brakeHold)
-    if self.CC.auto_res_starting:
-      events.add(EventName.resCruise)
+    if not self.CC.lkas_temp_disabled:
+      if self.CC.lanechange_manual_timer and ret.vEgo > 0.3:
+        events.add(EventName.laneChangeManual)
+      if self.CC.emergency_manual_timer:
+        events.add(EventName.emgButtonManual)
+      #if self.CC.driver_steering_torque_above_timer:
+      #  events.add(EventName.driverSteering)
+      if self.CC.standstill_res_button:
+        events.add(EventName.standstillResButton)
+      if self.CC.cruise_gap_adjusting:
+        events.add(EventName.gapAdjusting)
+      if self.CC.on_speed_control and ret.vEgo > 0.3:
+        events.add(EventName.camSpeedDown)
+      if self.CC.curv_speed_control and ret.vEgo > 8.3:
+        events.add(EventName.curvSpeedDown)
+      if self.CC.autohold_popup_timer:
+        events.add(EventName.brakeHold)
+      if self.CC.auto_res_starting:
+        events.add(EventName.resCruise)
     if self.CS.cruiseState_standstill or self.CC.standstill_status == 1:
       #events.add(EventName.standStill)
       self.CP.standStill = True
@@ -322,6 +369,10 @@ class CarInterface(CarInterfaceBase):
       self.CP.vFuture = self.CC.vFuture
     else:
       self.CP.vFuture = 0
+    if self.CC.vFutureA >= 1:
+      self.CP.vFutureA = self.CC.vFutureA
+    else:
+      self.CP.vFutureA = 0
     self.CP.aqValue = self.CC.aq_value
     self.CP.aqValueRaw = self.CC.aq_value_raw
 
@@ -337,6 +388,11 @@ class CarInterface(CarInterfaceBase):
       events.add(EventName.modeChangeOneway)
     elif self.CC.mode_change_timer and self.CS.out.cruiseState.modeSel == 5:
       events.add(EventName.modeChangeMaponly)
+
+    if self.CC.lkas_temp_disabled:
+      events.add(EventName.lkasDisabled)
+    elif self.CC.lkas_temp_disabled_timer:
+      events.add(EventName.lkasEnabled)
 
   # handle button presses
     for b in ret.buttonEvents:
@@ -366,6 +422,6 @@ class CarInterface(CarInterfaceBase):
     ret = self.CC.update(c, c.enabled, self.CS, self.frame, c.actuators,
                          c.cruiseControl.cancel, hud_control.visualAlert, hud_control.leftLaneVisible,
                          hud_control.rightLaneVisible, hud_control.leftLaneDepart, hud_control.rightLaneDepart,
-                         hud_control.setSpeed, hud_control.leadVisible, hud_control.vFuture)
+                         hud_control.setSpeed, hud_control.leadVisible, hud_control.vFuture, hud_control.vFutureA)
     self.frame += 1
     return ret

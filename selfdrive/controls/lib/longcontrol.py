@@ -8,6 +8,7 @@ from selfdrive.modeld.constants import T_IDXS
 from selfdrive.car.hyundai.values import CAR
 from common.conversions import Conversions as CV
 from common.params import Params
+from decimal import Decimal
 
 import common.log as trace1
 LongitudinalPlanSource = log.LongitudinalPlan.LongitudinalPlanSource
@@ -63,13 +64,14 @@ class LongControl():
 
     self.candidate = candidate
     self.long_log = Params().get_bool("LongLogDisplay")
+    self.stopping_dist = float(Decimal(Params().get("StoppingDist", encoding="utf8"))*Decimal('0.1'))
 
     self.vRel_prev = 0
     self.decel_damping = 1.0
     self.decel_damping2 = 1.0
     self.damping_timer3 = 1.0
     self.damping_timer = 0
-    self.loc_timer = 0 
+    self.loc_timer = 0
 
   def reset(self, v_pid):
     """Reset PID controller and change setpoint"""
@@ -118,7 +120,7 @@ class LongControl():
       vRel = radarState.leadOne.vRel
     if long_plan.hasLead:
       if 1 < CS.radarDistance <= 149:
-        stop = True if (dRel <= 3.5 and radarState.leadOne.status) else False
+        stop = True if (dRel <= self.stopping_dist and radarState.leadOne.status) else False
       else:
         stop = True if (dRel < 6.0 and radarState.leadOne.status) else False
     else:
@@ -127,7 +129,7 @@ class LongControl():
                                                        v_target, v_target_future, CS.brakePressed,
                                                        CS.cruiseState.standstill, stop, CS.gasPressed)
 
-    if (self.long_control_state == LongCtrlState.off or (CS.brakePressed or CS.gasPressed)) and self.candidate != CAR.NIRO_EV:
+    if (self.long_control_state == LongCtrlState.off or (CS.brakePressed or CS.gasPressed)) and self.candidate != CAR.NIRO_EV_DE:
       self.pid.reset()
       output_accel = 0.
     elif self.long_control_state == LongCtrlState.off or CS.gasPressed:

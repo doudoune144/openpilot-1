@@ -31,6 +31,9 @@
 #include "selfdrive/ui/qt/qt_window.h"
 #include "selfdrive/ui/qt/widgets/opkr.h"
 
+#include "selfdrive/ui/qt/widgets/steerWidget.h"
+
+
 TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
   // param, title, desc, icon
   std::vector<std::tuple<QString, QString, QString, QString>> toggles{
@@ -57,12 +60,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "Use Metric System",
       "Display speed in km/h instead of mph.",
       "../assets/offroad/icon_metric.png",
-    },
-    {
-      "UploadRaw",
-      "Upload Raw Logs",
-      "Upload full logs and full resolution video by default while on Wi-Fi. If not enabled, individual logs can be marked for upload at useradmin.comma.ai.",
-      "../assets/offroad/icon_network.png",
     },
     {
       "RecordFront",
@@ -101,12 +98,6 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "OpkrEnableUploader",
       "Enable Sending Log to Server",
       "Activate the upload process to transmit system logs and other driving data to the server. Upload it only off-road.",
-      "../assets/offroad/icon_shell.png",
-    },
-    {
-      "CommaStockUI",
-      "Use Comma Stock UI",
-      "Use the Stock UI of the comma on the driving screen. You can switch to real-time by pressing the box in the upper left corner of the driving screen.",
       "../assets/offroad/icon_shell.png",
     },
   };
@@ -167,11 +158,12 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   auto resetCalibBtn = new ButtonControl("Reset Calibration", "RESET", " ");
   connect(resetCalibBtn, &ButtonControl::showDescription, this, &DevicePanel::updateCalibDescription);
   connect(resetCalibBtn, &ButtonControl::clicked, [&]() {
-    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration? Device will be rebooted.", this)) {
+    if (ConfirmationDialog::confirm("Are you sure you want to reset calibration?", this)) {
       params.remove("CalibrationParams");
       params.remove("LiveParameters");
-      QTimer::singleShot(1000, []() {
-        Hardware::reboot();
+      params.putBool("OnRoadRefresh", true);
+      QTimer::singleShot(3000, [this]() {
+        params.putBool("OnRoadRefresh", false);
       });
     }
   });
@@ -188,6 +180,11 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
   QHBoxLayout *power_layout = new QHBoxLayout();
   power_layout->setSpacing(30);
 
+  QPushButton *refresh_btn = new QPushButton("Refresh");
+  refresh_btn->setObjectName("refresh_btn");
+  power_layout->addWidget(refresh_btn);
+  QObject::connect(refresh_btn, &QPushButton::clicked, this, &DevicePanel::refresh);
+
   QPushButton *reboot_btn = new QPushButton("Reboot");
   reboot_btn->setObjectName("reboot_btn");
   power_layout->addWidget(reboot_btn);
@@ -203,8 +200,10 @@ DevicePanel::DevicePanel(SettingsWindow *parent) : ListWidget(parent) {
       height: 120px;
       border-radius: 15px;
     }
-    #reboot_btn { background-color: #393939; }
-    #reboot_btn:pressed { background-color: #4a4a4a; }
+    #refresh_btn { background-color: #83c744; }
+    #refresh_btn:pressed { background-color: #c7deb1; }
+    #reboot_btn { background-color: #ed8e3b; }
+    #reboot_btn:pressed { background-color: #f0bf97; }
     #poweroff_btn { background-color: #E22C2C; }
     #poweroff_btn:pressed { background-color: #FF2424; }
   )");
@@ -233,6 +232,22 @@ void DevicePanel::updateCalibDescription() {
     }
   }
   qobject_cast<ButtonControl *>(sender())->setDescription(desc);
+}
+
+void DevicePanel::refresh() {
+  if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+    if (ConfirmationDialog::confirm("Are you sure you want to refresh?", this)) {
+      // Check engaged again in case it changed while the dialog was open
+      if (QUIState::ui_state.status == UIStatus::STATUS_DISENGAGED) {
+        Params().putBool("OnRoadRefresh", true);
+        QTimer::singleShot(3000, []() {
+          Params().putBool("OnRoadRefresh", false);
+        });
+      }
+    }
+  } else {
+    ConfirmationDialog::alert("Disengage to Refresh", this);
+  }
 }
 
 void DevicePanel::reboot() {
@@ -267,7 +282,7 @@ SoftwarePanel::SoftwarePanel(QWidget* parent) : ListWidget(parent) {
   gitCommitLbl = new LabelControl("Git Commit");
   osVersionLbl = new LabelControl("OS Version");
   versionLbl = new LabelControl("Fork");
-  lastUpdateLbl = new LabelControl("Last Updates Check Date", "", "");
+  lastUpdateLbl = new LabelControl("Last Updates Check", "", "");
   updateBtn = new ButtonControl("Check for Updates", "");
   connect(updateBtn, &ButtonControl::clicked, [=]() {
     if (params.getBool("IsOffroad")) {
@@ -600,7 +615,10 @@ DrivingPanel::DrivingPanel(QWidget *parent) : QFrame(parent) {
   layout->addWidget(new LeftCurvOffset());
   layout->addWidget(new RightCurvOffset());
   layout->addWidget(new BlindSpotDetectToggle());
-  layout->addWidget(new MaxAngleLimit());
+
+
+  layout->addWidget(new CSteerWidget());
+  
   layout->addWidget(new SteerAngleCorrection());
   layout->addWidget(new TurnSteeringDisableToggle());
   layout->addWidget(new CruiseOverMaxSpeedToggle());
@@ -633,6 +651,7 @@ DrivingPanel::DrivingPanel(QWidget *parent) : QFrame(parent) {
   layout->addWidget(new OPKREdgeOffset());
   layout->addWidget(new ToAvoidLKASFaultToggle());
   layout->addWidget(new ToAvoidLKASFault());
+  layout->addWidget(new SpeedCameraOffsetToggle());
 }
 
 DeveloperPanel::DeveloperPanel(QWidget *parent) : QFrame(parent) {
@@ -746,6 +765,27 @@ TuningPanel::TuningPanel(QWidget *parent) : QFrame(parent) {
     layout->addWidget(new TorqueKi());
     layout->addWidget(new TorqueFriction());
     layout->addWidget(new TorqueUseAngle());
+  } else if (lat_control == "4") {
+    layout->addWidget(new MultipleLatSelect());
+    layout->addWidget(new MultipleLateralSpeed());
+    layout->addWidget(new MultipleLateralAngle());
+    layout->addWidget(new TorqueMaxLatAccel());
+    layout->addWidget(new TorqueKp());
+    layout->addWidget(new TorqueKf());
+    layout->addWidget(new TorqueKi());
+    layout->addWidget(new TorqueFriction());
+    layout->addWidget(new TorqueUseAngle());
+    layout->addWidget(new Scale());
+    layout->addWidget(new LqrKi());
+    layout->addWidget(new DcGain());
+    layout->addWidget(new InnerLoopGain());
+    layout->addWidget(new OuterLoopGain());
+    layout->addWidget(new TimeConstant());
+    layout->addWidget(new ActuatorEffectiveness());
+    layout->addWidget(new PidKp());
+    layout->addWidget(new PidKi());
+    layout->addWidget(new PidKd());
+    layout->addWidget(new PidKf());
   }
 
   layout->addWidget(horizontal_line());
@@ -758,6 +798,7 @@ TuningPanel::TuningPanel(QWidget *parent) : QFrame(parent) {
   layout->addWidget(new DynamicTRBySpeed());
   layout->addWidget(new RadarLongHelperOption());
   layout->addWidget(new StoppingDistAdjToggle());
+  layout->addWidget(new StoppingDist());
   layout->addWidget(new E2ELongToggle());
   layout->addWidget(new StockDecelonCamToggle());
   //layout->addWidget(new RadarDisableToggle());

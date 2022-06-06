@@ -31,11 +31,13 @@ class LanePlanner:
     self.ll_x = np.zeros((TRAJECTORY_SIZE,))
     self.lll_y = np.zeros((TRAJECTORY_SIZE,))
     self.rll_y = np.zeros((TRAJECTORY_SIZE,))
-    self.lane_width_estimate = FirstOrderFilter(float(Decimal(Params().get("LaneWidth", encoding="utf8")) * Decimal('0.1')), 9.95, DT_MDL)
+
+    self.params = Params()
+    self.lane_width_estimate = FirstOrderFilter(float(Decimal(self.params.get("LaneWidth", encoding="utf8")) * Decimal('0.1')), 9.95, DT_MDL)
     self.lane_width_certainty = FirstOrderFilter(1.0, 0.95, DT_MDL)
-    self.lane_width = float(Decimal(Params().get("LaneWidth", encoding="utf8")) * Decimal('0.1'))
-    self.spd_lane_width_spd = list(map(float, Params().get("SpdLaneWidthSpd", encoding="utf8").split(',')))
-    self.spd_lane_width_set = list(map(float, Params().get("SpdLaneWidthSet", encoding="utf8").split(',')))
+    self.lane_width = float(Decimal(self.params.get("LaneWidth", encoding="utf8")) * Decimal('0.1'))
+    self.spd_lane_width_spd = list(map(float, self.params.get("SpdLaneWidthSpd", encoding="utf8").split(',')))
+    self.spd_lane_width_set = list(map(float, self.params.get("SpdLaneWidthSet", encoding="utf8").split(',')))
 
     self.lll_prob = 0.
     self.rll_prob = 0.
@@ -50,20 +52,22 @@ class LanePlanner:
     self.camera_offset = -CAMERA_OFFSET if wide_camera else CAMERA_OFFSET
     self.path_offset = -PATH_OFFSET if wide_camera else PATH_OFFSET
 
-    self.left_curv_offset = int(Params().get("LeftCurvOffsetAdj", encoding="utf8"))
-    self.right_curv_offset = int(Params().get("RightCurvOffsetAdj", encoding="utf8"))
+    self.left_curv_offset = int(self.params.get("LeftCurvOffsetAdj", encoding="utf8"))
+    self.right_curv_offset = int(self.params.get("RightCurvOffsetAdj", encoding="utf8"))
 
-    self.drive_routine_on_co = Params().get_bool("RoutineDriveOn")
+    self.drive_routine_on_co = self.params.get_bool("RoutineDriveOn")
     if self.drive_routine_on_co:
-      option_list = list(Params().get("RoutineDriveOption", encoding="utf8"))
+      option_list = list(self.params.get("RoutineDriveOption", encoding="utf8"))
       if '0' in option_list:
         self.drive_routine_on_co = True
       else:
         self.drive_routine_on_co = False
 
-    self.drive_close_to_edge = Params().get_bool("CloseToRoadEdge")
-    self.left_edge_offset = float(Decimal(Params().get("LeftEdgeOffset", encoding="utf8")) * Decimal('0.01'))
-    self.right_edge_offset = float(Decimal(Params().get("RightEdgeOffset", encoding="utf8")) * Decimal('0.01'))
+    self.drive_close_to_edge = self.params.get_bool("CloseToRoadEdge")
+    self.left_edge_offset = float(Decimal(self.params.get("LeftEdgeOffset", encoding="utf8")) * Decimal('0.01'))
+    self.right_edge_offset = float(Decimal(self.params.get("RightEdgeOffset", encoding="utf8")) * Decimal('0.01'))
+
+    self.speed_offset = self.params.get_bool("SpeedCameraOffset")
 
     self.lp_timer = 0
     self.lp_timer2 = 0
@@ -113,8 +117,9 @@ class LanePlanner:
     self.lp_timer += DT_MDL
     if self.lp_timer > 1.0:
       self.lp_timer = 0.0
-      if Params().get_bool("OpkrLiveTunePanelEnable"):
-        self.camera_offset = -(float(Decimal(Params().get("CameraOffsetAdj", encoding="utf8")) * Decimal('0.001')))
+      self.speed_offset = self.params.get_bool("SpeedCameraOffset")
+      if self.params.get_bool("OpkrLiveTunePanelEnable"):
+        self.camera_offset = -(float(Decimal(self.params.get("CameraOffsetAdj", encoding="utf8")) * Decimal('0.001')))
 
     if self.drive_close_to_edge: # opkr
       left_edge_prob = np.clip(1.0 - md.roadEdgeStds[0], 0.0, 1.0)
@@ -133,7 +138,11 @@ class LanePlanner:
         road_edge_offset = 0.0
     else:
       road_edge_offset = 0.0
-    self.total_camera_offset = self.camera_offset + lean_offset + current_road_offset + road_edge_offset
+    if self.speed_offset:
+      speed_offset = -interp(v_ego, [0, 11.1, 16.6, 22.2, 31], [0.12, 0.06, 0.03, 0.01, 0.0])
+    else:
+      speed_offset = 0.0
+    self.total_camera_offset = self.camera_offset + lean_offset + current_road_offset + road_edge_offset + speed_offset
 
     lane_lines = md.laneLines
     if len(lane_lines) == 4 and len(lane_lines[0].t) == TRAJECTORY_SIZE:
@@ -156,8 +165,8 @@ class LanePlanner:
     self.lp_timer2 += DT_MDL
     if self.lp_timer2 > 1.0:
       self.lp_timer2 = 0.0
-      if Params().get_bool("OpkrLiveTunePanelEnable"):
-        self.path_offset = -(float(Decimal(Params().get("PathOffsetAdj", encoding="utf8")) * Decimal('0.001')))
+      if self.params.get_bool("OpkrLiveTunePanelEnable"):
+        self.path_offset = -(float(Decimal(self.params.get("PathOffsetAdj", encoding="utf8")) * Decimal('0.001')))
     # Reduce reliance on lanelines that are too far apart or
     # will be in a few seconds
     path_xyz[:, 1] += self.path_offset

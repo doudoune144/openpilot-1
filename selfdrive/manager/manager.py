@@ -60,7 +60,7 @@ def manager_init() -> None:
     ("OpkrSteerAngleCorrection", "0"),
     ("PutPrebuiltOn", "1"),
     ("LdwsCarFix", "0"),
-    ("LateralControlMethod", "2"),
+    ("LateralControlMethod", "3"),
     ("CruiseStatemodeSelInit", "1"),
     ("InnerLoopGain", "35"),
     ("OuterLoopGain", "20"),
@@ -69,16 +69,16 @@ def manager_init() -> None:
     ("Scale", "1500"),
     ("LqrKi", "15"),
     ("DcGain", "270"),
-    ("PidKp", "25"),
-    ("PidKi", "50"),
+    ("PidKp", "23"),
+    ("PidKi", "45"),
     ("PidKd", "150"),
-    ("PidKf", "7"),
-    ("TorqueKp", "20"),
-    ("TorqueKf", "10"),
-    ("TorqueKi", "5"),
-    ("TorqueFriction", "10"),
+    ("PidKf", "6"),
+    ("TorqueKp", "14"),
+    ("TorqueKf", "9"),
+    ("TorqueKi", "1"),
+    ("TorqueFriction", "5"),
     ("TorqueUseAngle", "1"),
-    ("TorqueMaxLatAccel", "30"),
+    ("TorqueMaxLatAccel", "28"),
     ("CameraOffsetAdj", "60"),
     ("PathOffsetAdj", "0"),
     ("SteerRatioAdj", "1550"),
@@ -104,6 +104,11 @@ def manager_init() -> None:
     ("LongLogDisplay", "0"),
     ("OpkrBlindSpotDetect", "1"),
     ("OpkrMaxAngleLimit", "90"),
+    ("OpkrSteerMethod", "0"),
+    ("OpkrMaxSteeringAngle", "90"),
+    ("OpkrMaxDriverAngleWait", "0.002"),
+    ("OpkrMaxSteerAngleWait", "0.001"),
+    ("OpkrDriverAngleWait", "0.001"),
     ("OpkrSpeedLimitOffset", "0"),
     ("OpkrLiveSteerRatio", "1"),
     ("OpkrVariableSteerMax", "0"),
@@ -194,7 +199,7 @@ def manager_init() -> None:
     ("RoadList", "RoadName1,+0.0,RoadName2,-0.0\nRoadName3,30,RoadName4,60"),
     ("LaneWidth", "37"),
     ("SpdLaneWidthSpd", "0,31"),
-    ("SpdLaneWidthSet", "2.8,3.5"),
+    ("SpdLaneWidthSet", "2.3,3.5"),
     ("TopTextView", "0"),
     ("CloseToRoadEdge", "0"),
     ("LeftEdgeOffset", "0"),
@@ -211,6 +216,13 @@ def manager_init() -> None:
     ("SshEnabled", "1"),
     ("UserSpecificFeature", "0"),
     ("OpkrWakeUp", "0"),
+    ("MultipleLateralUse", "0"),
+    ("MultipleLateralOpS", "3,2,0"),
+    ("MultipleLateralSpd", "30,80"),
+    ("MultipleLateralOpA", "0,2,3"),
+    ("MultipleLateralAng", "10,30"),
+    ("StoppingDist", "35"),
+    ("SpeedCameraOffset", "0"),
    ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
@@ -284,8 +296,6 @@ def manager_init() -> None:
     os.chmod("/dev/shm", 0o777)
     os.chmod(os.path.join(BASEDIR, "cereal"), 0o755)
     os.chmod(os.path.join(BASEDIR, "cereal", "libmessaging_shared.so"), 0o755)
-
-  os.system("/data/openpilot/selfdrive/assets/addon/script/gitcommit.sh")
 
 def manager_prepare() -> None:
   for p in managed_processes.values():

@@ -321,16 +321,40 @@ static void ui_draw_debug(UIState *s) {
     }
     nvgFontSize(s->vg, 50);
     nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-    if (!scene.animated_rpm) {
-      if (scene.lateralControlMethod == 0) {
-        ui_print(s, ui_viz_rx_center, bdr_s+295, "PID");
-      } else if (scene.lateralControlMethod == 1) {
-        ui_print(s, ui_viz_rx_center, bdr_s+295, "INDI");
-      } else if (scene.lateralControlMethod == 2) {
-        ui_print(s, ui_viz_rx_center, bdr_s+295, "LQR");
-      } else if (scene.lateralControlMethod == 3) {
-        ui_print(s, ui_viz_rx_center, bdr_s+295, "TORQUE");
+
+
+    char const* szLaCMethod = nullptr;
+    char const* szLaCMethodCur = nullptr;
+    switch( scene.lateralControlMethod  )
+      {
+        case  0: szLaCMethod = "PID"; break;
+        case  1: szLaCMethod = "INDI"; break;
+        case  2: szLaCMethod = "LQR"; break;
+        case  3: szLaCMethod = "TORQUE"; break;
+        case  4: szLaCMethod = "MULTI"; break;
       }
+    switch( (int)scene.multi_lat_selected  )
+      {
+        case  0: szLaCMethodCur = "PID"; break;
+        case  1: szLaCMethodCur = "INDI"; break;
+        case  2: szLaCMethodCur = "LQR"; break;
+        case  3: szLaCMethodCur = "TORQUE"; break;
+      }
+    if ( !scene.animated_rpm )
+    {
+      if( szLaCMethod )
+          ui_print(s, ui_viz_rx_center, bdr_s+295, szLaCMethod );
+      if (scene.lateralControlMethod == 4) {
+        if( szLaCMethodCur )
+            ui_print(s, ui_viz_rx_center, bdr_s+330, szLaCMethodCur );
+        }
+    } else {
+      if( szLaCMethod )
+          ui_print(s, ui_viz_rx_center, bdr_s+320, szLaCMethod );
+      if (scene.lateralControlMethod == 4) {
+        if( szLaCMethodCur )
+            ui_print(s, ui_viz_rx_center, bdr_s+355, szLaCMethodCur );
+        }
     }
     nvgTextAlign(s->vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
     if (scene.osm_enabled) {
@@ -1605,84 +1629,144 @@ static void ui_draw_live_tune_panel(UIState *s) {
   //param value
   nvgFontSize(s->vg, 170);
   nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-  float max_lat_accel = s->scene.torqueMaxLatAccel * 0.1;
-  if (s->scene.live_tune_panel_list == 0) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%+0.3f", s->scene.cameraOffset*0.001);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "CameraOffset");
-  } else if (s->scene.live_tune_panel_list == 1) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%+0.3f", s->scene.pathOffset*0.001);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "PathOffset");
-  } else if (s->scene.live_tune_panel_list == 2) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.2f", s->scene.osteerRateCost*0.01);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "SteerRateCost");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+0) && s->scene.lateralControlMethod == 0) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.2f", s->scene.pidKp*0.01);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "Pid: Kp");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+1) && s->scene.lateralControlMethod == 0) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.3f", s->scene.pidKi*0.001);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "Pid: Ki");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+2) && s->scene.lateralControlMethod == 0) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.2f", s->scene.pidKd*0.01);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "Pid: Kd");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+3) && s->scene.lateralControlMethod == 0) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.5f", s->scene.pidKf*0.00001);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "Pid: Kf");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+0) && s->scene.lateralControlMethod == 1) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f", s->scene.indiInnerLoopGain*0.1);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "INDI: ILGain");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+1) && s->scene.lateralControlMethod == 1) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f", s->scene.indiOuterLoopGain*0.1);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "INDI: OLGain");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+2) && s->scene.lateralControlMethod == 1) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f", s->scene.indiTimeConstant*0.1);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "INDI: TConst");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+3) && s->scene.lateralControlMethod == 1) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f", s->scene.indiActuatorEffectiveness*0.1);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "INDI: ActEffct");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+0) && s->scene.lateralControlMethod == 2) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.0f", s->scene.lqrScale*1.0);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "LQR: Scale");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+1) && s->scene.lateralControlMethod == 2) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.3f", s->scene.lqrKi*0.001);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "LQR: Ki");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+2) && s->scene.lateralControlMethod == 2) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.5f", s->scene.lqrDcGain*0.00001);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "LQR: DcGain");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+0) && s->scene.lateralControlMethod == 3) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f>%0.2f", s->scene.torqueKp*0.1, (s->scene.torqueKp*0.1)/max_lat_accel);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "TORQUE: Kp");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+1) && s->scene.lateralControlMethod == 3) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f>%0.2f", s->scene.torqueKf*0.1, (s->scene.torqueKf*0.1)/max_lat_accel);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "TORQUE: Kf");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+2) && s->scene.lateralControlMethod == 3) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f>%0.2f", s->scene.torqueKi*0.1, (s->scene.torqueKi*0.1)/max_lat_accel);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "TORQUE: Ki");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+3) && s->scene.lateralControlMethod == 3) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.1f", s->scene.torqueMaxLatAccel*0.1);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "TORQUE: MaxL");
-  } else if (s->scene.live_tune_panel_list == (s->scene.list_count+4) && s->scene.lateralControlMethod == 3) {
-    ui_print(s, s->fb_w/2, y_pos + height/2, "%0.3f", s->scene.torqueFriction*0.001);
-    nvgFontSize(s->vg, 120);
-    ui_print(s, s->fb_w/2, y_pos - 95, "TORQUE: Fric");
+
+
+  int live_tune_panel_list = s->scene.live_tune_panel_list;
+  int lateralControlMethod = s->scene.lateralControlMethod;
+
+  char const* szTuneName = nullptr;
+  char szTuneParam[100];
+  int list_menu = live_tune_panel_list - (s->scene.list_count);
+
+  if (live_tune_panel_list == 0) {
+    sprintf(szTuneParam, "%+0.3f", s->scene.cameraOffset*0.001);
+    szTuneName = "CameraOffset";
+  } else if (live_tune_panel_list == 1) {
+    sprintf(szTuneParam, "%+0.3f", s->scene.pathOffset*0.001);
+    szTuneName = "PathOffset";
+  } else if (live_tune_panel_list == 2) {
+    sprintf(szTuneParam, "%0.2f", s->scene.osteerRateCost*0.01);
+    szTuneName = "SteerRateCost";
+  } else if (lateralControlMethod == 0) {  // 0.PID
+
+    if ( list_menu == 0 ) {
+      sprintf(szTuneParam, "%0.2f", s->scene.pidKp*0.01);
+      szTuneName = "Pid: Kp";
+    } else if (list_menu == 1 ) {
+      sprintf(szTuneParam, "%0.3f", s->scene.pidKi*0.001);
+      szTuneName = "Pid: Ki";
+    } else if (list_menu == 2 ) {
+      sprintf(szTuneParam, "%0.2f", s->scene.pidKd*0.01);
+      szTuneName = "Pid: Kd";
+    } else if (list_menu == 3 ) {
+      sprintf(szTuneParam, "%0.5f", s->scene.pidKf*0.00001);
+      szTuneName = "Pid: Kf";
+    }
+  } else if (lateralControlMethod == 1) {         // 1.INDI
+
+    if ( list_menu == 0 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiInnerLoopGain*0.1);
+      szTuneName = "INDI: ILGain";
+    } else if ( list_menu == 1 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiOuterLoopGain*0.1);
+      szTuneName = "INDI: OLGain";
+    } else if ( list_menu == 2 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiTimeConstant*0.1);
+      szTuneName = "INDI: TConst";
+    } else if ( list_menu == 3 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiActuatorEffectiveness*0.1);
+      szTuneName = "INDI: ActEffct";
+    }
+  } else if (lateralControlMethod == 2) {       // 2.LQR
+
+    if ( list_menu == 0 ) {
+      sprintf(szTuneParam, "%0.0f", s->scene.lqrScale*1.0);
+      szTuneName = "LQR: Scale";
+    } else if ( list_menu == 1) {
+      sprintf(szTuneParam, "%0.3f", s->scene.lqrKi*0.001);
+      szTuneName = "LQR: Ki";
+    } else if ( list_menu == 2 ) {
+      sprintf(szTuneParam, "%0.5f", s->scene.lqrDcGain*0.00001);
+      szTuneName = "LQR: DcGain";
+    }
+  } else if (lateralControlMethod == 3) {     // 3.TORQUE
+    float max_lat_accel = s->scene.torqueMaxLatAccel * 0.1;
+
+    if ( list_menu == 0 ) {
+      sprintf(szTuneParam, "%0.1f>%0.2f", s->scene.torqueKp*0.1, (s->scene.torqueKp*0.1)/max_lat_accel);
+      szTuneName = "TORQUE: Kp";
+    } else if ( list_menu == 1 ) {
+      sprintf(szTuneParam, "%0.1f>%0.2f", s->scene.torqueKf*0.1, (s->scene.torqueKf*0.1)/max_lat_accel);
+      szTuneName = "TORQUE: Kf";
+    } else if ( list_menu == 2 ) {
+      sprintf(szTuneParam, "%0.1f>%0.2f", s->scene.torqueKi*0.1, (s->scene.torqueKi*0.1)/max_lat_accel);
+      szTuneName = "TORQUE: Ki";
+    } else if ( list_menu == 3 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.torqueMaxLatAccel*0.1);
+      szTuneName = "TORQUE: MaxL";
+    } else if ( list_menu == 4 ) {
+      sprintf(szTuneParam, "%0.3f", s->scene.torqueFriction*0.001);
+      szTuneName = "TORQUE: Fric";
+    }
+  } else if (lateralControlMethod == 4) {     // 4.MULTI
+    float max_lat_accel = s->scene.torqueMaxLatAccel * 0.1;
+    if ( list_menu == 0 ) {
+      sprintf(szTuneParam, "%0.2f", s->scene.pidKp*0.01);
+      szTuneName = "Pid: Kp";
+    } else if (list_menu == 1 ) {
+      sprintf(szTuneParam, "%0.3f", s->scene.pidKi*0.001);
+      szTuneName = "Pid: Ki";
+    } else if (list_menu == 2 ) {
+      sprintf(szTuneParam, "%0.2f", s->scene.pidKd*0.01);
+      szTuneName = "Pid: Kd";
+    } else if (list_menu == 3 ) {
+      sprintf(szTuneParam, "%0.5f", s->scene.pidKf*0.00001);
+      szTuneName = "Pid: Kf";
+    } else if ( list_menu == 4 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiInnerLoopGain*0.1);
+      szTuneName = "INDI: ILGain";
+    } else if ( list_menu == 5 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiOuterLoopGain*0.1);
+      szTuneName = "INDI: OLGain";
+    } else if ( list_menu == 6 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiTimeConstant*0.1);
+      szTuneName = "INDI: TConst";
+    } else if ( list_menu == 7 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.indiActuatorEffectiveness*0.1);
+      szTuneName = "INDI: ActEffct";
+    } else if ( list_menu == 8 ) {
+      sprintf(szTuneParam, "%0.0f", s->scene.lqrScale*1.0);
+      szTuneName = "LQR: Scale";
+    } else if ( list_menu == 9) {
+      sprintf(szTuneParam, "%0.3f", s->scene.lqrKi*0.001);
+      szTuneName = "LQR: Ki";
+    } else if ( list_menu == 10 ) {
+      sprintf(szTuneParam, "%0.5f", s->scene.lqrDcGain*0.00001);
+      szTuneName = "LQR: DcGain";
+    } else if ( list_menu == 11 ) {
+      sprintf(szTuneParam, "%0.1f>%0.2f", s->scene.torqueKp*0.1, (s->scene.torqueKp*0.1)/max_lat_accel);
+      szTuneName = "TORQUE: Kp";
+    } else if ( list_menu == 12 ) {
+      sprintf(szTuneParam, "%0.1f>%0.2f", s->scene.torqueKf*0.1, (s->scene.torqueKf*0.1)/max_lat_accel);
+      szTuneName = "TORQUE: Kf";
+    } else if ( list_menu == 13 ) {
+      sprintf(szTuneParam, "%0.1f>%0.2f", s->scene.torqueKi*0.1, (s->scene.torqueKi*0.1)/max_lat_accel);
+      szTuneName = "TORQUE: Ki";
+    } else if ( list_menu == 14 ) {
+      sprintf(szTuneParam, "%0.1f", s->scene.torqueMaxLatAccel*0.1);
+      szTuneName = "TORQUE: MaxL";
+    } else if ( list_menu == 15 ) {
+      sprintf(szTuneParam, "%0.3f", s->scene.torqueFriction*0.001);
+      szTuneName = "TORQUE: Fric";
+    }
   }
+
+  if (szTuneName) {
+    ui_print(s, s->fb_w/2, y_pos + height/2, "%s", szTuneParam);
+    nvgFontSize(s->vg, 120);
+    ui_print(s, s->fb_w/2, y_pos - 95, szTuneName);
+  }
+
   nvgFillColor(s->vg, nvgRGBA(171,242,0,150));
   nvgFill(s->vg);
 }

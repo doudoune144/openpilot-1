@@ -33,7 +33,7 @@ def get_radar_can_parser(CP):
     return CANParser(DBC[CP.carFingerprint]['radar'], signals, checks, CP.sccBus)
   else:
     signals = [
-      # sig_name, sig_address, default
+      # signal_name, signal_address
       ("ObjValid", "SCC11"),
       ("ACC_ObjStatus", "SCC11"),
       ("ACC_ObjLatPos", "SCC11"),

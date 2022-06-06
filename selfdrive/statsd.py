@@ -107,15 +107,17 @@ def main() -> NoReturn:
         result += get_influxdb_line(f"gauge.{gauge_key}", gauges[gauge_key], current_time, tags)
 
       # clear intermediate data
+      idx = 0
       gauges = {}
       last_flush_time = time.monotonic()
 
       # check that we aren't filling up the drive
       if len(os.listdir(STATS_DIR)) < STATS_DIR_FILE_LIMIT:
         if len(result) > 0:
-          stats_path = os.path.join(STATS_DIR, str(int(current_time.timestamp())))
+          stats_path = os.path.join(STATS_DIR, f"{current_time.timestamp():.0f}_{idx}")
           with atomic_write_in_dir(stats_path) as f:
             f.write(result)
+          idx += 1
       else:
         cloudlog.error("stats dir full")
 

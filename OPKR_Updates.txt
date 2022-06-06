@@ -1,5 +1,20 @@
 ☞ Use two fingers to scroll down ☜
 
+2022-06-03
+- added VC & opkr long stopping distance adjustment
+  (distance car start slowing down for stopped lead car).
+2022-05-29
+- LKAS On/Off Toggle(Holding Gap Button for 1 sec) while SCC
+2022-05-27
+- Multiple Lateral Control by Speed or Angle
+2022-05-26
+- New model with better laneless
+2022-05-24
+- Hybrid Lateral Control by ATOM
+2022-05-21
+- vehicle name/spec update, ★You must reselect car in Developer Menu
+2022-05-18
+- joint model
 2022-05-16
 - Might be fixed cal&loc issue after current update
 - Add event to avoid collision at low speed when SCC is not activated

@@ -36,9 +36,9 @@ class LatControlPID(LatControl):
       self.steerKiV = float(Decimal(self.params.get("PidKi", encoding="utf8")) * Decimal('0.001'))
       self.steerKdV = float(Decimal(self.params.get("PidKd", encoding="utf8")) * Decimal('0.01'))
       self.steerKf = float(Decimal(self.params.get("PidKf", encoding="utf8")) * Decimal('0.00001'))
-      self.pid = LatPIDController((CP.lateralTuning.pid.kpBP, [0.1, self.steerKpV]),
-                          (CP.lateralTuning.pid.kiBP, [0.01, self.steerKiV]),
-                          (CP.lateralTuning.pid.kdBP, [self.steerKdV]),
+      self.pid = LatPIDController(([0., 9.], [0.1, self.steerKpV]),
+                          ([0., 9.], [0.01, self.steerKiV]),
+                          ([0.], [self.steerKdV]),
                           k_f=self.steerKf, pos_limit=1.0)
       self.mpc_frame = 0
 

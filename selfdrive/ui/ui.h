@@ -250,6 +250,7 @@ typedef struct UIScene {
   bool stop_line;
   int gear_step;
   float charge_meter;
+  float multi_lat_selected;
 
   cereal::DeviceState::Reader deviceState;
   cereal::CarState::Reader car_state;

@@ -148,6 +148,9 @@ static void update_state(UIState *s) {
       scene.output_scale = scene.controls_state.getLateralControlState().getLqrState().getOutput();
     } else if (scene.lateralControlMethod == 3) {
       scene.output_scale = scene.controls_state.getLateralControlState().getTorqueState().getOutput();
+    } else if (scene.lateralControlMethod == 4) {
+      scene.output_scale = scene.controls_state.getLateralControlState().getAtomState().getOutput();
+      scene.multi_lat_selected = scene.controls_state.getLateralControlState().getAtomState().getSelected();
     }
 
     scene.alertTextMsg1 = scene.controls_state.getAlertTextMsg1(); //debug1
@@ -420,9 +423,10 @@ static void update_status(UIState *s) {
   if (!s->scene.auto_gitpull && (s->sm->frame - s->scene.started_frame > 15*UI_FREQ)) {
     if (params.getBool("GitPullOnBoot")) {
       s->scene.auto_gitpull = true;
-      system("/data/openpilot/selfdrive/assets/addon/script/gitpull.sh");
+      system("/data/openpilot/selfdrive/assets/addon/script/gitpull.sh &");
     } else if (s->sm->frame - s->scene.started_frame > 20*UI_FREQ) {
       s->scene.auto_gitpull = true;
+      system("/data/openpilot/selfdrive/assets/addon/script/gitcommit.sh &");
     }
   }
 

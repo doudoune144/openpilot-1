@@ -994,8 +994,22 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   },
 
   EventName.lkasDisabled: {
-    ET.PERMANENT: NormalPermanentAlert("LKAS Disabled: Enable LKAS to engage"),
-    ET.NO_ENTRY: NoEntryAlert("LKAS Disabled"),
+    # ET.PERMANENT: NormalPermanentAlert("LKAS Disabled: Enable LKAS to engage"),
+    # ET.NO_ENTRY: NoEntryAlert("LKAS Disabled"),
+    ET.WARNING: Alert(
+      "LKAS is Off status",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.disengage, 1., alert_rate=0.5),
   },
 
+  EventName.lkasEnabled: {
+    # ET.PERMANENT: NormalPermanentAlert("LKAS Disabled: Enable LKAS to engage"),
+    # ET.NO_ENTRY: NoEntryAlert("LKAS Disabled"),
+    ET.WARNING: Alert(
+      "LKAS turned On",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.engage, 1.),
+  },
 }

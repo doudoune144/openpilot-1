@@ -4,7 +4,7 @@ import cereal.messaging as messaging
 from common.conversions import Conversions as CV
 from opendbc.can.parser import CANParser
 from opendbc.can.can_define import CANDefine
-from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, EV_CAR, HYBRID_CAR, Buttons
+from selfdrive.car.hyundai.values import DBC, STEER_THRESHOLD, FEATURES, EV_CAR, HYBRID_CAR, Buttons, CAR
 from selfdrive.car.interfaces import CarStateBase
 from common.numpy_fast import interp
 from common.params import Params
@@ -72,6 +72,7 @@ class CarState(CarStateBase):
     self.cruise_set_speed_kph = 0
     self.cruise_set_mode = int(Params().get("CruiseStatemodeSelInit", encoding="utf8"))
     self.gasPressed = False
+
 
     self.sm = messaging.SubMaster(['controlsState'])
 
@@ -146,7 +147,7 @@ class CarState(CarStateBase):
   def update(self, cp, cp2, cp_cam):
     cp_mdps = cp2 if self.CP.mdpsBus == 1 else cp
     cp_sas = cp2 if self.CP.sasBus else cp
-    cp_scc = cp_cam if ((self.CP.sccBus == 2) or self.CP.radarOffCan) else cp
+    cp_scc = cp_cam if self.CP.sccBus == 2 else cp2 if self.CP.sccBus == 1 else cp
     cp_fca = cp_cam if (self.CP.fcaBus == 2) else cp
 
     self.prev_cruise_buttons = self.cruise_buttons
@@ -334,7 +335,10 @@ class CarState(CarStateBase):
       gear = cp.vl["TCU12"]["CUR_GR"]
       ret.gearStep = 0
     elif self.CP.carFingerprint in FEATURES["use_elect_gears"]:
-      gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]
+      if self.CP.carFingerprint == CAR.NEXO_FE:
+        gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter_NEXO"] # NEXO's gear info from neokii. If someone can send me a cabana, I will find more clear info.
+      else:
+        gear = cp.vl["ELECT_GEAR"]["Elect_Gear_Shifter"]
       ret.gearStep = cp.vl["ELECT_GEAR"]["Elect_Gear_Step"] # opkr
     else:
       gear = cp.vl["LVR12"]["CF_Lvr_Gear"]
@@ -354,7 +358,7 @@ class CarState(CarStateBase):
         ret.stockFcw = cp_scc.vl["SCC12"]["CF_VSM_Warn"] == 2
 
     # Blind Spot Detection and Lane Change Assist signals
-    if self.CP.bsmAvailable or self.CP.enableBsm:
+    if self.CP.bsmAvailable:
       ret.leftBlindspot = cp.vl["LCA11"]["CF_Lca_IndLeft"] != 0
       ret.rightBlindspot = cp.vl["LCA11"]["CF_Lca_IndRight"] != 0
 
@@ -397,7 +401,7 @@ class CarState(CarStateBase):
   @staticmethod
   def get_can_parser(CP):
     signals = [
-      # sig_name, sig_address
+      # signal_name, signal_address
       ("WHL_SPD_FL", "WHL_SPD11"),
       ("WHL_SPD_FR", "WHL_SPD11"),
       ("WHL_SPD_RL", "WHL_SPD11"),
@@ -410,7 +414,7 @@ class CarState(CarStateBase):
       ("CF_Gway_DrvSeatBeltSw", "CGW1"),
       ("CF_Gway_DrvDrSw", "CGW1"),       # Driver Door
       ("CF_Gway_AstDrSw", "CGW1"),       # Passenger door
-      ("CF_Gway_RLDrSw", "CGW2"),        # Rear reft door
+      ("CF_Gway_RLDrSw", "CGW2"),        # Rear left door
       ("CF_Gway_RRDrSw", "CGW2"),        # Rear right door
       ("CF_Gway_TurnSigLh", "CGW1"),
       ("CF_Gway_TurnSigRh", "CGW1"),
@@ -510,7 +514,7 @@ class CarState(CarStateBase):
 
       ("N", "EMS_366"),
 
-      ("CF_Vcu_ChargeMeter", "EV_PC6"),
+      ("CF_Vcu_ChargeMeter", "EV_PC6")
     ]
 
     checks = [
@@ -522,19 +526,18 @@ class CarState(CarStateBase):
       ("CGW1", 10),
       ("CGW2", 5),
       ("CGW4", 5),
-      ("WHL_SPD11", 50),
+      ("WHL_SPD11", 50)
     ]
     if CP.sccBus == 0 and CP.pcmCruise:
       checks += [
         ("SCC11", 50),
-        ("SCC12", 50),
+        ("SCC12", 50)
       ]
     if CP.fcaBus == 0:
+      signals.append(("CR_Vcu_AccPedDep_Pos", "E_EMS11"))
       signals += [
         ("FCA_CmdAct", "FCA11"),
-        ("CF_VSM_Warn", "FCA11"),
-        ("CR_FCA_Alive", "FCA11"),
-        ("Supplemental_Counter", "FCA11"),
+        ("CF_VSM_Warn", "FCA11")
       ]
       checks += [("FCA11", 50)]
 
@@ -552,22 +555,19 @@ class CarState(CarStateBase):
         ("CF_Mdps_FailStat", "MDPS12"),
         ("CR_Mdps_OutTq", "MDPS12")
       ]
-      checks += [
-        ("MDPS12", 50)
-      ]
+      checks += [("MDPS12", 50)]
+
     if CP.sasBus == 0:
       signals += [
         ("SAS_Angle", "SAS11"),
-        ("SAS_Speed", "SAS11"),
+        ("SAS_Speed", "SAS11")
       ]
-      checks += [
-        ("SAS11", 100)
-      ]
+      checks += [("SAS11", 100)]
 
-    if CP.bsmAvailable or CP.enableBsm:
+    if CP.bsmAvailable:
       signals += [
         ("CF_Lca_IndLeft", "LCA11"),
-        ("CF_Lca_IndRight", "LCA11"),
+        ("CF_Lca_IndRight", "LCA11")
       ]
       checks += [("LCA11", 50)]
 
@@ -575,42 +575,31 @@ class CarState(CarStateBase):
       if CP.carFingerprint in HYBRID_CAR:
         signals += [
           ("CR_Vcu_AccPedDep_Pos", "E_EMS11"),
-          ("N", "E_EMS11"),
+          ("N", "E_EMS11")
         ]
       else:
-        signals += [
-          ("Accel_Pedal_Pos", "E_EMS11"),
-        ]
-      checks += [
-        ("E_EMS11", 50),
-      ]
+        signals += [("Accel_Pedal_Pos", "E_EMS11")]
+      checks += [("E_EMS11", 50)]
     else:
       signals += [
         ("PV_AV_CAN", "EMS12"),
-        ("CF_Ems_AclAct", "EMS16"),
+        ("CF_Ems_AclAct", "EMS16")
       ]
       checks += [
         ("EMS12", 100),
-        ("EMS16", 100),
+        ("EMS16", 100)
       ]
 
     if CP.carFingerprint in FEATURES["use_cluster_gears"]:
-      signals += [
-        ("CF_Clu_Gear", "CLU15"),
-      ]
-      checks += [
-        ("CLU15", 5)
-      ]
+      signals += [("CF_Clu_Gear", "CLU15")]
+      checks += [("CLU15", 5)]
     elif CP.carFingerprint in FEATURES["use_tcu_gears"]:
-      signals += [
-        ("CUR_GR", "TCU12")
-      ]
-      checks += [
-        ("TCU12", 100)
-      ]
+      signals += [("CUR_GR", "TCU12")]
+      checks += [("TCU12", 100)]
     elif CP.carFingerprint in FEATURES["use_elect_gears"]:
       signals += [
         ("Elect_Gear_Shifter", "ELECT_GEAR"),
+        ("Elect_Gear_Shifter_NEXO", "ELECT_GEAR"),
         ("Elect_Gear_Step", "ELECT_GEAR"),
         ("Elect_Motor_Speed", "ELECT_GEAR")
       ]
@@ -624,6 +613,9 @@ class CarState(CarStateBase):
         ("LVR12", 100),
         ("LVR11", 100)
       ]
+
+    if CP.carFingerprint == CAR.SANTAFE_TM:
+      checks.remove(("TCS13", 50))
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 0, enforce_checks=False)
 
@@ -645,22 +637,71 @@ class CarState(CarStateBase):
         ("CF_Mdps_FailStat", "MDPS12"),
         ("CR_Mdps_OutTq", "MDPS12")
       ]
-      checks += [
-        ("MDPS12", 50)
-      ]
+      checks += [("MDPS12", 50)]
     if CP.sasBus == 1:
       signals += [
         ("SAS_Angle", "SAS11"),
-        ("SAS_Speed", "SAS11"),
+        ("SAS_Speed", "SAS11")
+      ]
+      checks += [("SAS11", 100)]
+    if CP.sccBus == 1:
+      signals += [
+        ("MainMode_ACC", "SCC11"),
+        ("SCCInfoDisplay", "SCC11"),
+        ("AliveCounterACC", "SCC11"),
+        ("VSetDis", "SCC11"),
+        ("ObjValid", "SCC11"),
+        ("DriverAlertDisplay", "SCC11"),
+        ("TauGapSet", "SCC11"),
+        ("ACC_ObjStatus", "SCC11"),
+        ("ACC_ObjLatPos", "SCC11"),
+        ("ACC_ObjDist", "SCC11"),
+        ("ACC_ObjRelSpd", "SCC11"),
+        ("Navi_SCC_Curve_Status", "SCC11"),
+        ("Navi_SCC_Curve_Act", "SCC11"),
+        ("Navi_SCC_Camera_Act", "SCC11"),
+        ("Navi_SCC_Camera_Status", "SCC11"),
+
+        ("ACCMode", "SCC12"),
+        ("CF_VSM_Prefill", "SCC12"),
+        ("CF_VSM_DecCmdAct", "SCC12"),
+        ("CF_VSM_HBACmd", "SCC12"),
+        ("CF_VSM_Warn", "SCC12"),
+        ("CF_VSM_Stat", "SCC12"),
+        ("CF_VSM_BeltCmd", "SCC12"),
+        ("ACCFailInfo", "SCC12"),
+        ("StopReq", "SCC12"),
+        ("CR_VSM_DecCmd", "SCC12"),
+        ("aReqRaw", "SCC12"), #aReqMax
+        ("TakeOverReq", "SCC12"),
+        ("PreFill", "SCC12"),
+        ("aReqValue", "SCC12"), #aReqMin
+        ("CF_VSM_ConfMode", "SCC12"),
+        ("AEB_Failinfo", "SCC12"),
+        ("AEB_Status", "SCC12"),
+        ("AEB_CmdAct", "SCC12"),
+        ("AEB_StopReq", "SCC12"),
+        ("CR_VSM_Alive", "SCC12"),
+        ("CR_VSM_ChkSum", "SCC12"),
+
+        ("SCCDrvModeRValue", "SCC13"),
+        ("SCC_Equip", "SCC13"),
+        ("AebDrvSetStatus", "SCC13"),
+
+        ("JerkUpperLimit", "SCC14"),
+        ("JerkLowerLimit", "SCC14"),
+        ("SCCMode2", "SCC14"),
+        ("ComfortBandUpper", "SCC14"),
+        ("ComfortBandLower", "SCC14")
       ]
       checks += [
-        ("SAS11", 100)
+        ("SCC11", 50),
+        ("SCC12", 50)
       ]
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 1, enforce_checks=False)
 
   @staticmethod
   def get_cam_can_parser(CP):
-
     signals = [
       # sig_name, sig_address
       ("CF_Lkas_LdwsActivemode", "LKAS11"),
@@ -679,13 +720,10 @@ class CarState(CarStateBase):
       ("CF_Lkas_MsgCount", "LKAS11"),
       ("CF_Lkas_FusionState", "LKAS11"),
       ("CF_Lkas_FcwOpt_USM", "LKAS11"),
-      ("CF_Lkas_LdwsOpt_USM", "LKAS11"),
+      ("CF_Lkas_LdwsOpt_USM", "LKAS11")
     ]
-
-    checks = [
-      ("LKAS11", 100)
-    ]
-    if CP.sccBus == 2 or CP.radarOffCan:
+    checks = [("LKAS11", 100)]
+    if CP.sccBus == 2:
       signals += [
         ("MainMode_ACC", "SCC11"),
         ("SCCInfoDisplay", "SCC11"),
@@ -735,11 +773,11 @@ class CarState(CarStateBase):
         ("ComfortBandUpper", "SCC14"),
         ("ComfortBandLower", "SCC14"),
         ("ACCMode", "SCC14"),
-        ("ObjGap", "SCC14"),
+        ("ObjGap", "SCC14")
       ]
       checks += [
         ("SCC11", 50),
-        ("SCC12", 50),
+        ("SCC12", 50)
       ]
       if CP.fcaBus == 2:
         signals += [
@@ -759,7 +797,7 @@ class CarState(CarStateBase):
           ("CR_FCA_Alive", "FCA11"),
           ("CR_FCA_ChkSum", "FCA11"),
           ("Supplemental_Counter", "FCA11"),
-          ("PAINT1_Status", "FCA11"),
+          ("PAINT1_Status", "FCA11")
         ]
         checks += [("FCA11", 50)]
 
@@ -769,7 +807,7 @@ class CarState(CarStateBase):
           ("HDA_Active", "LFAHDA_MFC"),
           ("HDA_Icon_State", "LFAHDA_MFC"),
           ("HDA_LdwSysState", "LFAHDA_MFC"),
-          ("HDA_Icon_Wheel", "LFAHDA_MFC"),
+          ("HDA_Icon_Wheel", "LFAHDA_MFC")
         ]
         checks += [("LFAHDA_MFC", 20)]
 

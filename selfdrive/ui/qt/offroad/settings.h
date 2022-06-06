@@ -47,6 +47,7 @@ private slots:
   void poweroff();
   void reboot();
   void updateCalibDescription();
+  void refresh();
 
 private:
   Params params;

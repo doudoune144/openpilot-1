@@ -22,6 +22,7 @@ from selfdrive.controls.lib.latcontrol_indi import LatControlINDI
 from selfdrive.controls.lib.latcontrol_lqr import LatControlLQR
 from selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from selfdrive.controls.lib.latcontrol_torque import LatControlTorque
+from selfdrive.controls.lib.latcontrol_atom import LatControlATOM
 from selfdrive.controls.lib.events import Events, ET
 from selfdrive.controls.lib.alertmanager import AlertManager, set_offroad_alert
 from selfdrive.controls.lib.vehicle_model import VehicleModel
@@ -141,7 +142,7 @@ class Controls:
     self.lateral_control_method = 0
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CI)
-      self.lateral_control_method = 4
+      self.lateral_control_method = 5
     elif self.CP.lateralTuning.which() == 'pid':
       self.LaC = LatControlPID(self.CP, self.CI)
       self.lateral_control_method = 0
@@ -154,6 +155,10 @@ class Controls:
     elif self.CP.lateralTuning.which() == 'torque':
       self.LaC = LatControlTorque(self.CP, self.CI)
       self.lateral_control_method = 3
+    elif self.CP.lateralTuning.which() == 'atom':
+      self.LaC = LatControlATOM(self.CP, self.CI)
+      self.lateral_control_method = 4
+
     self.controlsAllowed = False
 
     self.initialized = False
@@ -230,6 +235,7 @@ class Controls:
     self.osm_off_spdlimit_init = False
     self.v_cruise_kph_set_timer = 0
     self.safety_speed = 0
+    self.lkas_temporary_off = False
     try:
       self.roadname_and_slc = Params().get("RoadList", encoding="utf8").strip().splitlines()[1].split(',')
     except:
@@ -297,25 +303,26 @@ class Controls:
         self.events.add(EventName.calibrationInvalid)
 
     # Handle lane change
-    if self.sm['lateralPlan'].laneChangeState == LaneChangeState.preLaneChange:
-      direction = self.sm['lateralPlan'].laneChangeDirection
-      if (CS.leftBlindspot and direction == LaneChangeDirection.left) or \
-         (CS.rightBlindspot and direction == LaneChangeDirection.right):
-        self.events.add(EventName.laneChangeBlocked)
-      else:
-        if direction == LaneChangeDirection.left:
-          if self.lane_change_delay == 0:
-            self.events.add(EventName.preLaneChangeLeft)
-          else:
-            self.events.add(EventName.laneChange)
+    if not self.lkas_temporary_off:
+      if self.sm['lateralPlan'].laneChangeState == LaneChangeState.preLaneChange:
+        direction = self.sm['lateralPlan'].laneChangeDirection
+        if (CS.leftBlindspot and direction == LaneChangeDirection.left) or \
+          (CS.rightBlindspot and direction == LaneChangeDirection.right):
+          self.events.add(EventName.laneChangeBlocked)
         else:
-          if self.lane_change_delay == 0:
-            self.events.add(EventName.preLaneChangeRight)
+          if direction == LaneChangeDirection.left:
+            if self.lane_change_delay == 0:
+              self.events.add(EventName.preLaneChangeLeft)
+            else:
+              self.events.add(EventName.laneChange)
           else:
-            self.events.add(EventName.laneChange)
-    elif self.sm['lateralPlan'].laneChangeState in (LaneChangeState.laneChangeStarting,
-                                                    LaneChangeState.laneChangeFinishing):
-      self.events.add(EventName.laneChange)
+            if self.lane_change_delay == 0:
+              self.events.add(EventName.preLaneChangeRight)
+            else:
+              self.events.add(EventName.laneChange)
+      elif self.sm['lateralPlan'].laneChangeState in (LaneChangeState.laneChangeStarting,
+                                                      LaneChangeState.laneChangeFinishing):
+        self.events.add(EventName.laneChange)
 
     if self.can_rcv_error or not CS.canValid and self.ignore_can_error_on_isg and CS.vEgo > 1:
       self.events.add(EventName.canError)
@@ -654,7 +661,7 @@ class Controls:
       actuators.accel, actuators.oaccel = self.LoC.update(self.active and CS.cruiseState.speed > 1., CS, self.CP, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
 
       # Steering PID loop and lateral MPC
-      lat_active = self.active and not CS.steerFaultPermanent and not (CS.vEgo < self.CP.minSteerSpeed and self.no_mdps_mods)
+      lat_active = self.active and not CS.steerFaultPermanent and not (CS.vEgo < self.CP.minSteerSpeed and self.no_mdps_mods) and not self.lkas_temporary_off
       desired_curvature, desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
                                                                              lat_plan.psis,
                                                                              lat_plan.curvatures,
@@ -749,10 +756,14 @@ class Controls:
     speeds = self.sm['longitudinalPlan'].speeds # 17 lists
     if len(speeds) > 1:
       v_future = speeds[0]
+      v_future_a = speeds[-1]
     else:
       v_future = 100.0
+      v_future_a = 100.0
     v_future_speed= float((v_future * CV.MS_TO_MPH + 10.0) if CS.isMph else (v_future * CV.MS_TO_KPH))
+    v_future_speed_a= float((v_future_a * CV.MS_TO_MPH + 10.0) if CS.isMph else (v_future_a * CV.MS_TO_KPH))
     hudControl.vFuture = v_future_speed
+    hudControl.vFutureA = v_future_speed_a
 
     recent_blinker = (self.sm.frame - self.last_blinker_frame) * DT_CTRL < 5.0  # 5s blinker cooldown
     ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker \
@@ -806,13 +817,13 @@ class Controls:
           self.hkg_stock_lkas_timer = 0
       if not self.hkg_stock_lkas:
         # send car controls over can
-        self.last_actuators, can_sends, self.safety_speed = self.CI.apply(CC)
+        self.last_actuators, can_sends, self.safety_speed, self.lkas_temporary_off = self.CI.apply(CC)
         self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
         CC.actuatorsOutput = self.last_actuators
     else:
       if not self.read_only and self.initialized:
         # send car controls over can
-        self.last_actuators, can_sends, self.safety_speed = self.CI.apply(CC)
+        self.last_actuators, can_sends, self.safety_speed, self.lkas_temporary_off = self.CI.apply(CC)
         self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
         CC.actuatorsOutput = self.last_actuators
 
@@ -900,7 +911,13 @@ class Controls:
       controlsState.lateralControlState.indiState = lac_log
     elif lat_tuning == 'torque':
       controlsState.lateralControlState.torqueState = lac_log
-    controlsState.steeringAngleDesiredDeg = self.desired_angle_deg
+    elif lat_tuning == 'atom':
+      controlsState.lateralControlState.atomState = lac_log      
+      
+    if lat_tuning == 'torque':
+      controlsState.steeringAngleDesiredDeg = lac_log.desiredLateralAccel
+    else:
+      controlsState.steeringAngleDesiredDeg = self.desired_angle_deg
 
     self.pm.send('controlsState', dat)
 

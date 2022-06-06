@@ -9,12 +9,19 @@
 #include "selfdrive/ui/ui.h"
 #include <QComboBox>
 #include <QAbstractItemView>
+#include <QMessageBox>
+#include <QProcess>
 
 class SwitchOpenpilot : public ButtonControl {
   Q_OBJECT
 
 public:
   SwitchOpenpilot();
+  void executeProgram(const QString &tcmd);
+
+private slots:
+  void printMsg();
+  void processFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 private:
   Params params;
@@ -22,6 +29,10 @@ private:
   QString githubid;
   QString githubrepo;
   QString githubbranch;
+
+  QProcess *textMsgProcess;
+  QMessageBox *outbox;
+  QString outdata;
 
   void refresh();
   void getUserID(const QString &userid);
@@ -738,6 +749,18 @@ public:
   }
 };
 
+class SpeedCameraOffsetToggle : public ToggleControl {
+  Q_OBJECT
+
+public:
+  SpeedCameraOffsetToggle() : ToggleControl("Speed CameraOffset", "This increase offset at low speed and decrease offset at low speed. If you feel car moves to right at low speed.", "../assets/offroad/icon_shell.png", Params().getBool("SpeedCameraOffset")) {
+    QObject::connect(this, &SpeedCameraOffsetToggle::toggleFlipped, [=](int state) {
+      bool status = state ? true : false;
+      Params().putBool("SpeedCameraOffset", status);
+    });
+  }
+};
+
 // openpilot preview
 class OpenpilotView : public AbstractControl {
   Q_OBJECT
@@ -1010,20 +1033,7 @@ private:
   void refresh();
 };
 
-class MaxAngleLimit : public AbstractControl {
-  Q_OBJECT
 
-public:
-  MaxAngleLimit();
-
-private:
-  QPushButton btnplus;
-  QPushButton btnminus;
-  QLabel label;
-  Params params;
-  
-  void refresh();
-};
 
 class SpeedLimitOffset : public AbstractControl {
   Q_OBJECT
@@ -1242,6 +1252,9 @@ private:
   QLabel label;
   Params params;
   
+  int latcontrol;
+
+
   void refresh();
 };
 
@@ -2281,5 +2294,90 @@ private:
   QLineEdit edit;
   Params params;
 
+  void refresh();
+};
+
+class MultipleLatSelect : public AbstractControl {
+  Q_OBJECT
+
+public:
+  MultipleLatSelect();
+
+private:
+  QPushButton btnplus;
+  QPushButton btnminus;
+  QLabel label;
+  Params params;
+  
+  int    m_nMethod;
+
+
+  void refresh();
+};
+
+class MultipleLateralSpeed : public AbstractControl {
+  Q_OBJECT
+
+public:
+  MultipleLateralSpeed();
+
+private:
+  QLabel label1;
+  QPushButton btnplusl;
+  QLabel labell;
+  QPushButton btnminusl;
+  QPushButton btnplusr;
+  QLabel labelr;
+  QPushButton btnminusr;
+  QPushButton btn1;
+  QPushButton btn2;
+  QPushButton btn3;
+  Params params;
+  
+  void refresh1();
+  void refresh2();
+  void refresh3();
+  void refreshl();
+  void refreshr();
+};
+
+class MultipleLateralAngle : public AbstractControl {
+  Q_OBJECT
+
+public:
+  MultipleLateralAngle();
+
+private:
+  QLabel label1;
+  QPushButton btnplusl;
+  QLabel labell;
+  QPushButton btnminusl;
+  QPushButton btnplusr;
+  QLabel labelr;
+  QPushButton btnminusr;
+  QPushButton btn1;
+  QPushButton btn2;
+  QPushButton btn3;
+  Params params;
+  
+  void refresh1();
+  void refresh2();
+  void refresh3();
+  void refreshl();
+  void refreshr();
+};
+
+class StoppingDist : public AbstractControl {
+  Q_OBJECT
+
+public:
+  StoppingDist();
+
+private:
+  QPushButton btnplus;
+  QPushButton btnminus;
+  QLabel label;
+  Params params;
+  
   void refresh();
 };

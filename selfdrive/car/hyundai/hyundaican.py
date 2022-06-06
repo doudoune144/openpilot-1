@@ -9,7 +9,7 @@ hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
                   cut_steer_temp, lkas11, sys_warning, sys_state, enabled,
                   left_lane, right_lane,
-                  left_lane_depart, right_lane_depart, bus, ldws):
+                  left_lane_depart, right_lane_depart, bus, ldws, cnt):
   values = lkas11
   values["CF_Lkas_LdwsSysState"] = sys_state
   values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0
@@ -18,9 +18,10 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
   values["CR_Lkas_StrToqReq"] = apply_steer
   values["CF_Lkas_ActToi"] = steer_req and not cut_steer_temp
   values["CF_Lkas_ToiFlt"] = cut_steer_temp  # seems to allow actuation on CR_Lkas_StrToqReq
-  values["CF_Lkas_MsgCount"] = frame % 0x10
+  values["CF_Lkas_MsgCount"] = cnt
+  values["CF_Lkas_Chksum"] = 0
 
-  if car_fingerprint == CAR.GRANDEUR_IG_HEV:
+  if car_fingerprint == CAR.GRANDEUR_HEV_IG:
     nSysWarnVal = 9
     if steer_req:
       nSysWarnVal = 4
@@ -48,8 +49,10 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
     # Note: the warning is hidden while the blinkers are on
     values["CF_Lkas_SysWarning"] = 4 if sys_warning else 0
 
-  elif car_fingerprint == CAR.GENESIS:
+  elif car_fingerprint == CAR.GENESIS_DH:
     values["CF_Lkas_LdwsActivemode"] = 2
+  # elif car_fingerprint in (CAR.K5_HEV_JF, CAR.K5_JF, CAR.K7_HEV_YG, CAR.K7_YG):
+  #   values["CF_Lkas_LdwsActivemode"] = 0
 
   if ldws:
   	values["CF_Lkas_LdwsOpt_USM"] = 3
@@ -136,10 +139,10 @@ def create_scc11(packer, frame, set_speed, lead_visible, scc_live, lead_dist, le
 
   return packer.make_can_msg("SCC11", 0, values)
 
-def create_scc12(packer, apply_accel, enabled, scc_live, gaspressed, brakepressed, aebcmdact, car_fingerprint, speed, stopping, standstill, radar_recognition, scc12):
+def create_scc12(packer, apply_accel, enabled, scc_live, gaspressed, brakepressed, aebcmdact, car_fingerprint, speed, stopping, standstill, radar_recognition, cnt, scc12):
   values = scc12
   if not aebcmdact:
-    if enabled and car_fingerprint == CAR.NIRO_EV:
+    if enabled and car_fingerprint == CAR.NIRO_EV_DE:
       values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
       values["aReqRaw"] = apply_accel
       values["aReqValue"] = apply_accel
@@ -163,15 +166,16 @@ def create_scc12(packer, apply_accel, enabled, scc_live, gaspressed, brakepresse
       values["ACCMode"] = 0
       values["aReqRaw"] = 0
       values["aReqValue"] = 0
-    values["CR_VSM_ChkSum"] = 0
   if not scc_live:
     if apply_accel < 0.0 and standstill:
       values["StopReq"] = 1
     else:
       values["StopReq"] = 0
     values["ACCMode"] = 1 if enabled else 0 # 2 if gas padel pressed
-    dat = packer.make_can_msg("SCC12", 0, values)[2]
-    values["CR_VSM_ChkSum"] = 16 - sum([sum(divmod(i, 16)) for i in dat]) % 16
+  values["CR_VSM_Alive"] = cnt
+  values["CR_VSM_ChkSum"] = 0
+  dat = packer.make_can_msg("SCC12", 0, values)[2]
+  values["CR_VSM_ChkSum"] = 16 - sum([sum(divmod(i, 16)) for i in dat]) % 16
 
   return packer.make_can_msg("SCC12", 0, values)
 
@@ -181,7 +185,7 @@ def create_scc13(packer, scc13):
 
 def create_scc14(packer, enabled, scc14, aebcmdact, lead_visible, lead_dist, v_ego, standstill, car_fingerprint):
   values = scc14
-  if enabled and not aebcmdact and car_fingerprint == CAR.NIRO_EV:
+  if enabled and not aebcmdact and car_fingerprint == CAR.NIRO_EV_DE:
     if standstill:
       values["JerkUpperLimit"] = 0.5
       values["JerkLowerLimit"] = 10.

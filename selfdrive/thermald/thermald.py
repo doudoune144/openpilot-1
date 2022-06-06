@@ -240,6 +240,7 @@ def thermald_thread() -> NoReturn:
 
   is_openpilot_dir = True
   wakeuprunning = False
+  onroadrefresh = False
 
   while 1:
     ts = sec_since_boot()
@@ -432,6 +433,13 @@ def thermald_thread() -> NoReturn:
 
     if TICI:
       set_offroad_alert_if_changed("Offroad_StorageMissing", (not Path("/data/media").is_mount()))
+
+    if params.get_bool("OnRoadRefresh"):
+      onroad_conditions["onroad_refresh"] = not params.get_bool("OnRoadRefresh")
+      onroadrefresh = True
+    elif onroadrefresh:
+       onroadrefresh = False
+       onroad_conditions["onroad_refresh"] = True
 
     # Handle offroad/onroad transition
     should_start = all(onroad_conditions.values())
