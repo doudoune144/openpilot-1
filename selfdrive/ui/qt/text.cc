@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
   label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::MinimumExpanding);
   ScrollView *scroll = new ScrollView(label);
   scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-  main_layout->addWidget(scroll, 0, 0, Qt::AlignTop);
+  main_layout->addWidget(scroll, 0, 0, 1, 4, Qt::AlignTop);
 
   // Scroll to the bottom
   QObject::connect(scroll->verticalScrollBar(), &QAbstractSlider::rangeChanged, [=]() {
@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
 #ifdef __aarch64__
   QPushButton *btn2 = new QPushButton();
   QPushButton *btn3 = new QPushButton();
+  QPushButton *btn4 = new QPushButton();
   QLabel *label2 = new QLabel();
   QString device_ip = "---";
   const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
@@ -50,10 +51,11 @@ int main(int argc, char *argv[]) {
   }
   label2->setText(device_ip);
   label2->setStyleSheet("color: #e0e879");
-  main_layout->addWidget(label2, 0, 0, Qt::AlignRight | Qt::AlignTop);
-  btn->setText(" Update ");
+  main_layout->addWidget(label2, 0, 0, 1, 4, Qt::AlignRight | Qt::AlignTop);
+  btn->setText("Update");
   btn2->setText("MixPlorer");
-  btn3->setText(" Restore ");
+  btn3->setText("Restore");
+  btn4->setText("Reset");
   QObject::connect(btn, &QPushButton::clicked, [=]() {
     QProcess::execute("pkill -f thermald");
     QProcess::execute("rm -f /data/openpilot/prebuilt");
@@ -70,13 +72,22 @@ int main(int argc, char *argv[]) {
     QProcess::execute(cmd);
     QProcess::execute("reboot");
   });
-  main_layout->addWidget(btn2, 1, 0, Qt::AlignLeft | Qt::AlignBottom);
-  main_layout->addWidget(btn3, 1, 0, Qt::AlignCenter | Qt::AlignBottom);
+  QObject::connect(btn4, &QPushButton::clicked, [=]() {
+    btn4->setEnabled(false);
+    QProcess::execute("/data/openpilot/selfdrive/assets/addon/script/git_reset.sh");
+  });
+  btn2->setFixedSize(400, 150);
+  btn3->setFixedSize(400, 150);
+  btn4->setFixedSize(400, 150);
+  main_layout->addWidget(btn2, 1, 0, 1, 1, Qt::AlignCenter | Qt::AlignBottom);
+  main_layout->addWidget(btn3, 1, 1, 1, 1, Qt::AlignCenter | Qt::AlignBottom);
+  main_layout->addWidget(btn4, 1, 2, 1, 1, Qt::AlignCenter | Qt::AlignBottom);
 #else
   btn->setText("Exit");
   QObject::connect(btn, &QPushButton::clicked, &a, &QApplication::quit);
 #endif
-  main_layout->addWidget(btn, 1, 0, Qt::AlignRight | Qt::AlignBottom);
+  btn->setFixedSize(400, 150);
+  main_layout->addWidget(btn, 1, 3, 1, 1, Qt::AlignCenter | Qt::AlignBottom);
 
   window.setStyleSheet(R"(
     * {
@@ -87,8 +98,8 @@ int main(int argc, char *argv[]) {
     }
     QPushButton {
       padding: 40px;
-      padding-right: 80px;
-      padding-left: 80px;
+      padding-right: 40px;
+      padding-left: 40px;
       border: 2px solid white;
       border-radius: 20px;
       margin-right: 30px;

@@ -497,6 +497,18 @@ public:
   }
 };
 
+class StopAtStopSignToggle : public ToggleControl {
+  Q_OBJECT
+
+public:
+  StopAtStopSignToggle() : ToggleControl("Stop at Stop Sign", "Openpilot tries to stop at stop sign depends on Model.", "../assets/offroad/icon_shell.png", Params().getBool("StopAtStopSign")) {
+    QObject::connect(this, &StopAtStopSignToggle::toggleFlipped, [=](int state) {
+      bool status = state ? true : false;
+      Params().putBool("StopAtStopSign", status);
+    });
+  }
+};
+
 class GoogleMapEnabledToggle : public ToggleControl {
   Q_OBJECT
 
@@ -785,6 +797,18 @@ public:
   }
 };
 
+class OSMOfflineUseToggle : public ToggleControl {
+  Q_OBJECT
+
+public:
+  OSMOfflineUseToggle() : ToggleControl("Offline OSM(64G storage only)", "Local only OSM. This will download DBs from online.", "../assets/offroad/icon_shell.png", Params().getBool("OSMOfflineUse")) {
+    QObject::connect(this, &OSMOfflineUseToggle::toggleFlipped, [=](int state) {
+      bool status = state ? true : false;
+      Params().putBool("OSMOfflineUse", status);
+    });
+  }
+};
+
 // openpilot preview
 class OpenpilotView : public AbstractControl {
   Q_OBJECT
@@ -821,11 +845,21 @@ class BranchSelectCombo : public AbstractControl
 
 public:
   BranchSelectCombo();
+  void executeProgram1(const QString &tcmd1);
+
+private slots:
+  void printMsg1();
+  void processFinished1(int exitCode, QProcess::ExitStatus exitStatus);
 
 private:
   QPushButton btn;
   QComboBox combobox;
   Params params;
+
+  QProcess *textMsgProcess1;
+  QMessageBox *outbox1;
+  QString outdata1;
+  QString branch_name1;
 
   void refresh();
 };
@@ -1542,6 +1576,21 @@ class TorqueMaxLatAccel : public AbstractControl {
 
 public:
   TorqueMaxLatAccel();
+
+private:
+  QPushButton btnplus;
+  QPushButton btnminus;
+  QLabel label;
+  Params params;
+  
+  void refresh();
+};
+
+class TorqueAngDeadZone : public AbstractControl {
+  Q_OBJECT
+
+public:
+  TorqueAngDeadZone();
 
 private:
   QPushButton btnplus;

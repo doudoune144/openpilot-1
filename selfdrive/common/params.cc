@@ -215,6 +215,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"TorqueFriction", PERSISTENT},
     {"TorqueUseAngle", PERSISTENT},
     {"TorqueMaxLatAccel", PERSISTENT},
+    {"TorqueAngDeadZone", PERSISTENT},
     {"CameraOffsetAdj", PERSISTENT},
     {"PathOffsetAdj", PERSISTENT},
     {"SteerRatioAdj", PERSISTENT},
@@ -376,6 +377,8 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"HoldForSetting", PERSISTENT},
     {"GitCommits", CLEAR_ON_MANAGER_START},
     {"RTShield", PERSISTENT},
+    {"OSMOfflineUse", PERSISTENT},
+    {"StopAtStopSign", PERSISTENT},
 };
 
 } // namespace

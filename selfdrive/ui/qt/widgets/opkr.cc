@@ -22,13 +22,13 @@
 SwitchOpenpilot::SwitchOpenpilot() : ButtonControl("Change Repo/Branch", "", "Change to another open pilot code. You can change it by entering ID/repository/branch.") {
   QObject::connect(this, &ButtonControl::clicked, [=]() {
     if (text() == "CHANGE") {
-      QString userid = InputDialog::getText("First: Input the Git ID.", this);
+      QString userid = InputDialog::getText("First: Input the Git ID.", this, "github.com/<ID>/<Repository>.git -b <Branch>", false, 1, "openpilotkr");
       if (userid.length() > 0) {
         getUserID(userid);
-        QString repoid = InputDialog::getText("Second: Input the repository.", this);
+        QString repoid = InputDialog::getText("Second: Input the repository.", this, "github.com/"+userid+"/<Repository>.git -b <Branch>", false, 1, "openpilot");
         if (repoid.length() > 0) {
           getRepoID(repoid);
-          QString branchid = InputDialog::getText("Last: Input the branch name.", this);
+          QString branchid = InputDialog::getText("Last: Input the branch name.", this, "github.com/"+userid+"/"+repoid+".git -b <Branch>", false, 1, "OPKR");
           if (branchid.length() > 0) {
             getBranchID(branchid);
             githubbranch = branchid;
@@ -40,7 +40,7 @@ SwitchOpenpilot::SwitchOpenpilot() : ButtonControl("Change Repo/Branch", "", "Ch
               QDateTime a = QDateTime::currentDateTime();
               QString as = a.toString(time_format);
               QString cmd1 = "mv /data/openpilot /data/openpilot_" + as;
-              QString tcmd = "git clone -b " + githubbranch + " --single-branch https://github.com/" + githubid + "/" + githubrepo + ".git /data/openpilot";
+              QString tcmd = "git clone --progress -b " + githubbranch + " --single-branch https://github.com/" + githubid + "/" + githubrepo + ".git /data/openpilot";
               QString cmd3 = "rm -f /data/openpilot_" + as + "/prebuilt";
               QProcess::execute("pkill -f thermald");
               QProcess::execute(cmd1);
@@ -71,7 +71,7 @@ void SwitchOpenpilot::printMsg() {
   QString texto = QString::fromLocal8Bit(datao);
   QString texte = QString::fromLocal8Bit(datae);
   outdata = texto+texte;
-  outbox->setText(outdata);
+  outbox->setText(outdata.right(200));
   outbox->show();
 }
 
@@ -384,25 +384,56 @@ BranchSelectCombo::BranchSelectCombo() : AbstractControl("", "", "")
   QObject::connect(&combobox, static_cast<void(QComboBox::*)(int)>(&QComboBox::activated), [=](int index)
   {
     combobox.itemData(combobox.currentIndex());
-    QString str = combobox.currentText();
-    QString current_branch = QString::fromStdString(params.get("GitBranch"));
-    if (combobox.currentIndex() != 0 && str != current_branch) {
-      if (ConfirmationDialog::confirm("Now will checkout the branch, <" + str + ">. The device will be rebooted if completed.", this)) {
-        QString cmd1 = "git -C /data/openpilot remote set-branches --add origin " + str;
-        QString cmd2 = "git -C /data/openpilot checkout --track origin/" + str;
-        QString cmd3 = "git -C /data/openpilot checkout " + str;
+    branch_name1 = combobox.currentText();
+    QString current_branch1 = QString::fromStdString(params.get("GitBranch"));
+    if (combobox.currentIndex() != 0 && branch_name1 != current_branch1) {
+      if (ConfirmationDialog::confirm("Now will checkout the branch, <" + branch_name1 + ">. The device will be rebooted if completed.", this)) {
+        QString cmd1 = "git -C /data/openpilot remote set-branches --add origin " + branch_name1;
+        QString tcmd1 = "git -C /data/openpilot fetch --progress origin";
         QProcess::execute("git -C /data/openpilot clean -d -f -f");
         QProcess::execute(cmd1);
-        QProcess::execute("git -C /data/openpilot fetch origin");
-        QProcess::execute(cmd2);
-        QProcess::execute(cmd3);
-        std::system("/data/openpilot/selfdrive/assets/addon/script/git_reset.sh");
+        QProcess::execute("/data/openpilot/selfdrive/assets/addon/script/git_remove.sh");
+        textMsgProcess1 = new QProcess(this);
+        outbox1 = new QMessageBox(this);
+        outbox1->setStyleSheet("QLabel{min-width:800px; font-size: 50px;}");
+        QObject::connect(textMsgProcess1, SIGNAL(readyReadStandardOutput()), this, SLOT(printMsg1()));
+        QObject::connect(textMsgProcess1, SIGNAL(readyReadStandardError()), this, SLOT(printMsg1()));
+        QObject::connect(textMsgProcess1, SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(processFinished1(int, QProcess::ExitStatus)));
+        executeProgram1(tcmd1);
       }
-    } else if (combobox.currentIndex() != 0 && str == current_branch) {
-      if (ConfirmationDialog::alert("Your branch is already <" + current_branch + ">.", this)) {combobox.setCurrentIndex(0);}
+    } else if (combobox.currentIndex() != 0 && branch_name1 == current_branch1) {
+      if (ConfirmationDialog::alert("Your branch is already <" + current_branch1 + ">.", this)) {combobox.setCurrentIndex(0);}
     }
   });
   refresh();
+}
+
+void BranchSelectCombo::printMsg1() {
+  QByteArray datao1;
+  QByteArray datae1;
+  datao1 = textMsgProcess1->readAllStandardOutput();
+  datae1 = textMsgProcess1->readAllStandardError();
+  QString texto1 = QString::fromLocal8Bit(datao1);
+  QString texte1 = QString::fromLocal8Bit(datae1);
+  outdata1 = texto1+texte1;
+  outbox1->setText(outdata1.right(200));
+  outbox1->show();
+}
+
+void BranchSelectCombo::executeProgram1(const QString &tcmd1) {
+  QString program1 = QString(tcmd1);
+  textMsgProcess1->start(program1);
+  textMsgProcess1->waitForStarted();
+}
+
+void BranchSelectCombo::processFinished1(int exitCode, QProcess::ExitStatus exitStatus) {
+  QString cmd2 = "git -C /data/openpilot checkout --track origin/" + branch_name1;
+  QString cmd3 = "git -C /data/openpilot checkout " + branch_name1;
+  if(exitStatus == QProcess::NormalExit) {
+    QProcess::execute(cmd2);
+    QProcess::execute(cmd3);
+    std::system("/data/openpilot/selfdrive/assets/addon/script/git_reset.sh");
+  }
 }
 
 void BranchSelectCombo::refresh() {
@@ -1516,7 +1547,7 @@ void CruisemodeSelInit::refresh() {
   }
 }
 
-LaneChangeSpeed::LaneChangeSpeed() : AbstractControl("LaneChange On/Off/Spd", "On/Off lane change(push (-) btn till Off value) and set the lane changeable speed.", "../assets/offroad/icon_shell.png") {
+LaneChangeSpeed::LaneChangeSpeed() : AbstractControl("LaneChange On/Off/Spd", "On/Off lane change(push (-) btn till Off value) and set the lane changeable speed. This value can be kph or mph.", "../assets/offroad/icon_shell.png") {
 
   label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
   label.setStyleSheet("color: #e0e879");
@@ -1548,9 +1579,9 @@ LaneChangeSpeed::LaneChangeSpeed() : AbstractControl("LaneChange On/Off/Spd", "O
   QObject::connect(&btnminus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("OpkrLaneChangeSpeed"));
     int value = str.toInt();
-    value = value - 5;
-    if (value <= 15) {
-      value = 15;
+    value = value - 1;
+    if (value <= -1) {
+      value = 100;
     }
     QString values = QString::number(value);
     params.put("OpkrLaneChangeSpeed", values.toStdString());
@@ -1560,9 +1591,9 @@ LaneChangeSpeed::LaneChangeSpeed() : AbstractControl("LaneChange On/Off/Spd", "O
   QObject::connect(&btnplus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("OpkrLaneChangeSpeed"));
     int value = str.toInt();
-    value = value + 5;
-    if (value >= 160) {
-      value = 160;
+    value = value + 1;
+    if (value >= 101) {
+      value = 0;
     }
     QString values = QString::number(value);
     params.put("OpkrLaneChangeSpeed", values.toStdString());
@@ -1573,7 +1604,7 @@ LaneChangeSpeed::LaneChangeSpeed() : AbstractControl("LaneChange On/Off/Spd", "O
 
 void LaneChangeSpeed::refresh() {
   QString option = QString::fromStdString(params.get("OpkrLaneChangeSpeed"));
-  if (option == "15") {
+  if (option == "0") {
     label.setText(QString::fromStdString("Off"));
   } else {
     label.setText(QString::fromStdString(params.get("OpkrLaneChangeSpeed")));
@@ -4601,6 +4632,69 @@ void TorqueMaxLatAccel::refresh() {
   label.setText(QString::fromStdString(valuefs.toStdString()));
 }
 
+TorqueAngDeadZone::TorqueAngDeadZone() : AbstractControl("AngleDeadZone", "Adjust TorqueAngDeadZone", "../assets/offroad/icon_shell.png") {
+
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignRight);
+  label.setStyleSheet("color: #e0e879");
+  hlayout->addWidget(&label);
+
+  btnminus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 35px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnplus.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 35px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+  btnminus.setFixedSize(150, 100);
+  btnplus.setFixedSize(150, 100);
+  btnminus.setText("－");
+  btnplus.setText("＋");
+  hlayout->addWidget(&btnminus);
+  hlayout->addWidget(&btnplus);
+
+  QObject::connect(&btnminus, &QPushButton::clicked, [=]() {
+    auto str = QString::fromStdString(params.get("TorqueAngDeadZone"));
+    int value = str.toInt();
+    value = value - 1;
+    if (value <= 0) {
+      value = 0;
+    }
+    QString values = QString::number(value);
+    params.put("TorqueAngDeadZone", values.toStdString());
+    refresh();
+  });
+  
+  QObject::connect(&btnplus, &QPushButton::clicked, [=]() {
+    auto str = QString::fromStdString(params.get("TorqueAngDeadZone"));
+    int value = str.toInt();
+    value = value + 1;
+    if (value >= 50) {
+      value = 50;
+    }
+    QString values = QString::number(value);
+    params.put("TorqueAngDeadZone", values.toStdString());
+    refresh();
+  });
+  refresh();
+}
+
+void TorqueAngDeadZone::refresh() {
+  auto strs = QString::fromStdString(params.get("TorqueAngDeadZone"));
+  int valuei = strs.toInt();
+  float valuef = valuei * 0.1;
+  QString valuefs = QString::number(valuef);
+  label.setText(QString::fromStdString(valuefs.toStdString()));
+}
+
 CruiseGapTR::CruiseGapTR() : AbstractControl("CruiseGap", "Adjust the inter-vehicle distance (TR) according to the cruise gap. TR refers to the time in seconds of collision with the car in front, and the larger it becomes, the farther it is from the car in front.", "") {
   QString dtr = QString::fromStdString(params.get("DynamicTRGap"));
   if (dtr == "0") {
@@ -7052,7 +7146,7 @@ MultipleLatSelect::MultipleLatSelect() : AbstractControl("Multi LateralControl",
   QObject::connect(&btnminus, &QPushButton::clicked, [=]() {
     m_nMethod -= 1;
     if (m_nMethod < 0) {
-      m_nMethod = 2;
+      m_nMethod = 3;
     }
 
     QString values = QString::number(m_nMethod);
@@ -7063,7 +7157,7 @@ MultipleLatSelect::MultipleLatSelect() : AbstractControl("Multi LateralControl",
   QObject::connect(&btnplus, &QPushButton::clicked, [=]() {
   
     m_nMethod += 1;
-    if (m_nMethod > 2) {
+    if (m_nMethod > 3) {
       m_nMethod = 0;
     }
     QString values = QString::number(m_nMethod);
@@ -7078,9 +7172,10 @@ void MultipleLatSelect::refresh() {
 
   switch( m_nMethod )
   {
-    case 0 : strMethod = "0.Speed"; break;
-    case 1 : strMethod = "1.Angle"; break;
-    case 2 : strMethod = "2.Angle.L"; break;
+    case 0 : strMethod = "Spd_LowDlt"; break;
+    case 1 : strMethod = "Ang_LowDlt"; break;
+    case 2 : strMethod = "Ang_Interp"; break;
+    case 3 : strMethod = "Spd_Interp"; break;
     default :
       strMethod = "None"; 
       break;

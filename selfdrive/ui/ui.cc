@@ -325,6 +325,26 @@ static void update_state(UIState *s) {
     scene.lateralPlan.lanelessModeStatus = lp_data.getLanelessMode();
     scene.lateralPlan.totalCameraOffset = lp_data.getTotalCameraOffset();
   }
+  if (sm.updated("longitudinalPlan")) {
+    scene.longitudinal_plan = sm["longitudinalPlan"].getLongitudinalPlan();
+    auto lop_data = sm["longitudinalPlan"].getLongitudinalPlan();
+    for (int i = 0; i < std::size(scene.longitudinalPlan.e2ex); i++) {
+      scene.longitudinalPlan.e2ex[i] = lop_data.getE2eX()[i];
+    }
+    for (int i = 0; i < std::size(scene.longitudinalPlan.lead0); i++) {
+      scene.longitudinalPlan.lead0[i] = lop_data.getLead0Obstacle()[i];
+    }
+    for (int i = 0; i < std::size(scene.longitudinalPlan.lead1); i++) {
+      scene.longitudinalPlan.lead1[i] = lop_data.getLead1Obstacle()[i];
+    }
+    for (int i = 0; i < std::size(scene.longitudinalPlan.cruisetg); i++) {
+      scene.longitudinalPlan.cruisetg[i] = lop_data.getCruiseTarget()[i];
+    }
+    for (int i = 0; i < std::size(scene.longitudinalPlan.stopline); i++) {
+      scene.longitudinalPlan.stopline[i] = lop_data.getStopLine()[i];
+    }
+    scene.longitudinalPlan.stopprob = lop_data.getStoplineProb();
+  }
   // opkr
   if (sm.updated("liveNaviData")) {
     scene.live_navi_data = sm["liveNaviData"].getLiveNaviData();
@@ -515,6 +535,7 @@ static void update_status(UIState *s) {
     s->scene.osm_enabled = params.getBool("OSMEnable") || params.getBool("OSMSpeedLimitEnable") || std::stoi(params.get("CurvDecelOption")) == 1 || std::stoi(params.get("CurvDecelOption")) == 3;
     s->scene.animated_rpm = params.getBool("AnimatedRPM");
     s->scene.stop_line = params.getBool("ShowStopLine");
+    s->scene.lateralControlMethod = std::stoi(params.get("LateralControlMethod"));
 
     if (s->scene.autoScreenOff > 0) {
       s->scene.nTime = s->scene.autoScreenOff * 60 * UI_FREQ;
@@ -537,7 +558,7 @@ QUIState::QUIState(QObject *parent) : QObject(parent) {
   ui_state.sm = std::make_unique<SubMaster, const std::initializer_list<const char *>>({
     "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "roadCameraState",
     "pandaState", "carParams", "driverMonitoringState", "sensorEvents", "carState", "liveLocationKalman",
-    "ubloxGnss", "gpsLocationExternal", "liveParameters", "lateralPlan", "liveNaviData", "liveMapData",
+    "ubloxGnss", "gpsLocationExternal", "liveParameters", "lateralPlan", "liveNaviData", "liveMapData", "longitudinalPlan",
   });
 
   Params params;

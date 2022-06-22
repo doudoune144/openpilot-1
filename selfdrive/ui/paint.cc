@@ -142,8 +142,29 @@ static void draw_lead(UIState *s, const cereal::RadarState::LeadData::Reader &le
 }
 
 static void ui_draw_stop_line(UIState *s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const line_vertices_data &vd) {
-  NVGcolor color = nvgRGBAf(1.0, 0.0, 0.0, stop_line_data.getProb());
+  NVGcolor color = nvgRGBAf(0.8, 0.0, 0.0, stop_line_data.getProb());
   ui_draw_line(s, vd, &color, nullptr);
+}
+
+static void ui_draw_stop_sign(UIState *s) {
+  float center_x = 1400.0f;
+  float center_y = 100.0f;
+  float radius_i = 5.0f;
+  float radius_o = 75.0f;
+
+  if (s->scene.longitudinalPlan.e2ex[12] > 30 && s->scene.longitudinalPlan.stopline[12] < 10 && s->scene.car_state.getVEgo() < 0.5) {
+    nvgBeginPath(s->vg);
+    nvgCircle(s->vg, center_x, center_y, radius_i+radius_o);
+    NVGpaint stop_sign = nvgRadialGradient(s->vg, center_x, center_y, radius_i, radius_o, nvgRGBAf(0.0, 1.0, 0.0, 0.9), nvgRGBAf(0.0, 0.0, 0.0, 0.3));
+    nvgFillPaint(s->vg, stop_sign);
+    nvgFill(s->vg);
+  } else if (s->scene.longitudinalPlan.e2ex[12] < 100 && s->scene.longitudinalPlan.stopline[12] < 100) {
+    nvgBeginPath(s->vg);
+    nvgCircle(s->vg, center_x, center_y, radius_i+radius_o);
+    NVGpaint stop_sign = nvgRadialGradient(s->vg, center_x, center_y, radius_i, radius_o, nvgRGBAf(1.0, 0.0, 0.0, 0.9), nvgRGBAf(0.0, 0.0, 0.0, 0.4));
+    nvgFillPaint(s->vg, stop_sign);
+    nvgFill(s->vg);
+  }
 }
 
 static void ui_draw_vision_lane_lines(UIState *s) {
@@ -156,7 +177,23 @@ static void ui_draw_vision_lane_lines(UIState *s) {
 
   float red_lvl_line = 0;
   float green_lvl_line = 0;
-  //if (!scene.end_to_end) {
+
+
+
+  // paint left blindspot line
+  NVGcolor color;
+  if( scene.leftblindspot )
+  {
+    color = nvgRGBAf(1.0, 0.0, 0.0, std::clamp<float>(1.0 - scene.lane_blindspot_probs[0], 0.0, 1.0));
+    ui_draw_line(s, scene.lane_blindspot_vertices[0], &color, nullptr);
+   }
+
+  if( scene.rightblindspot )
+  {
+    color = nvgRGBAf(1.0, 0.0, 0.0, std::clamp<float>(1.0 - scene.lane_blindspot_probs[1], 0.0, 1.0));
+    ui_draw_line(s, scene.lane_blindspot_vertices[1], &color, nullptr);
+  }
+
   if (!scene.lateralPlan.lanelessModeStatus) {
     // paint lanelines, Hoya's colored lane line
     for (int i = 0; i < std::size(scene.lane_line_vertices); i++) {
@@ -167,7 +204,7 @@ static void ui_draw_vision_lane_lines(UIState *s) {
         red_lvl_line = 1.0;
         green_lvl_line = 1.0 - ((0.4 - scene.lane_line_probs[i]) * 2.5);
       }
-      NVGcolor color = nvgRGBAf(1.0, 1.0, 1.0, scene.lane_line_probs[i]);
+      color = nvgRGBAf(1.0, 1.0, 1.0, scene.lane_line_probs[i]);
       if (!scene.comma_stock_ui) {
         color = nvgRGBAf(red_lvl_line, green_lvl_line, 0, 1);
       }
@@ -176,7 +213,7 @@ static void ui_draw_vision_lane_lines(UIState *s) {
 
     // paint road edges
     for (int i = 0; i < std::size(scene.road_edge_vertices); i++) {
-      NVGcolor color = nvgRGBAf(1.0, 0.0, 0.0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0));
+      color = nvgRGBAf(1.0, 0.0, 0.0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0));
       ui_draw_line(s, scene.road_edge_vertices[i], &color, nullptr);
     }
   }
@@ -200,23 +237,6 @@ static void ui_draw_vision_lane_lines(UIState *s) {
   }
 
  
-  // paint left blindspot line
-
-  NVGcolor color;
-  if( scene.leftblindspot )
-  {
-    color = nvgRGBAf(1.0, 0.0, 0.0, std::clamp<float>(1.0 - scene.lane_blindspot_probs[0], 0.0, 1.0));
-    ui_draw_line(s, scene.lane_blindspot_vertices[0], &color, nullptr);
- 
-  }
-
-  if( scene.rightblindspot )
-  {
-    color = nvgRGBAf(1.0, 0.0, 0.0, std::clamp<float>(1.0 - scene.lane_blindspot_probs[1], 0.0, 1.0));
-    ui_draw_line(s, scene.lane_blindspot_vertices[1], &color, nullptr);
-  }
-
-
   // paint path
   ui_draw_line(s, scene.track_vertices, nullptr, &track_bg);
 }
@@ -239,7 +259,7 @@ static void ui_draw_world(UIState *s) {
     if (lead_two.getStatus() && (std::abs(lead_one.getDRel() - lead_two.getDRel()) > 3.0)) {
       draw_lead(s, lead_two, s->scene.lead_vertices[1]);
     }
-    if (s->scene.stop_line) {
+    if (s->scene.stop_line && s->scene.longitudinalPlan.stopline[12] > 1.1) {
       auto stop_line = (*s->sm)["modelV2"].getModelV2().getStopLine();
       if (stop_line.getProb() > .5) {
         ui_draw_stop_line(s, stop_line, s->scene.stop_line_vertices);
@@ -328,16 +348,41 @@ static void ui_draw_debug(UIState *s) {
     // const std::string stateStrings[] = {"disabled", "preEnabled", "enabled", "softDisabling"};
     // ui_print(s, ui_viz_rx, ui_viz_ry+520, "%s", stateStrings[(int)(*s->sm)["controlsState"].getControlsState().getState()].c_str());
     //ui_print(s, ui_viz_rx, ui_viz_ry+800, "A:%.5f", scene.accel_sensor2);
-    if (scene.map_is_running) {
-      if (scene.liveNaviData.opkrspeedsign) ui_print(s, ui_viz_rx, ui_viz_ry+600, "SS:%d", scene.liveNaviData.opkrspeedsign);
-      if (scene.liveNaviData.opkrspeedlimit) ui_print(s, ui_viz_rx, ui_viz_ry+640, "SL:%d", scene.liveNaviData.opkrspeedlimit);
-      if (scene.liveNaviData.opkrspeedlimitdist) ui_print(s, ui_viz_rx, ui_viz_ry+680, "DS:%.0f", scene.liveNaviData.opkrspeedlimitdist);
-      if (scene.liveNaviData.opkrturninfo) ui_print(s, ui_viz_rx, ui_viz_ry+720, "TI:%d", scene.liveNaviData.opkrturninfo);
-      if (scene.liveNaviData.opkrdisttoturn) ui_print(s, ui_viz_rx, ui_viz_ry+760, "DT:%.0f", scene.liveNaviData.opkrdisttoturn);
-    } else if (!scene.map_is_running && (*s->sm)["carState"].getCarState().getSafetySign() > 19) {
-      ui_print(s, ui_viz_rx, ui_viz_ry+600, "SL:%.0f", (*s->sm)["carState"].getCarState().getSafetySign());
-      ui_print(s, ui_viz_rx, ui_viz_ry+640, "DS:%.0f", (*s->sm)["carState"].getCarState().getSafetyDist());
+    if (!scene.nDebugUi3) {
+      if (scene.map_is_running) {
+        if (scene.liveNaviData.opkrspeedsign) ui_print(s, ui_viz_rx, ui_viz_ry+600, "SS:%d", scene.liveNaviData.opkrspeedsign);
+        if (scene.liveNaviData.opkrspeedlimit) ui_print(s, ui_viz_rx, ui_viz_ry+640, "SL:%d", scene.liveNaviData.opkrspeedlimit);
+        if (scene.liveNaviData.opkrspeedlimitdist) ui_print(s, ui_viz_rx, ui_viz_ry+680, "DS:%.0f", scene.liveNaviData.opkrspeedlimitdist);
+        if (scene.liveNaviData.opkrturninfo) ui_print(s, ui_viz_rx, ui_viz_ry+720, "TI:%d", scene.liveNaviData.opkrturninfo);
+        if (scene.liveNaviData.opkrdisttoturn) ui_print(s, ui_viz_rx, ui_viz_ry+760, "DT:%.0f", scene.liveNaviData.opkrdisttoturn);
+      } else if (!scene.map_is_running && (*s->sm)["carState"].getCarState().getSafetySign() > 19) {
+        ui_print(s, ui_viz_rx, ui_viz_ry+600, "SL:%.0f", (*s->sm)["carState"].getCarState().getSafetySign());
+        ui_print(s, ui_viz_rx, ui_viz_ry+640, "DS:%.0f", (*s->sm)["carState"].getCarState().getSafetyDist());
+      }
     }
+  if (scene.nDebugUi3) {
+    ui_print(s, ui_viz_rx, ui_viz_ry+600, "0: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+     scene.longitudinalPlan.lead0[0], scene.longitudinalPlan.lead0[1], scene.longitudinalPlan.lead0[2], scene.longitudinalPlan.lead0[3], scene.longitudinalPlan.lead0[4],
+     scene.longitudinalPlan.lead0[5], scene.longitudinalPlan.lead0[6], scene.longitudinalPlan.lead0[7], scene.longitudinalPlan.lead0[8], scene.longitudinalPlan.lead0[9],
+     scene.longitudinalPlan.lead0[10], scene.longitudinalPlan.lead0[11], scene.longitudinalPlan.lead0[12]);
+    ui_print(s, ui_viz_rx, ui_viz_ry+640, "1: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+     scene.longitudinalPlan.lead1[0], scene.longitudinalPlan.lead1[1], scene.longitudinalPlan.lead1[2], scene.longitudinalPlan.lead1[3], scene.longitudinalPlan.lead1[4],
+     scene.longitudinalPlan.lead1[5], scene.longitudinalPlan.lead1[6], scene.longitudinalPlan.lead1[7], scene.longitudinalPlan.lead1[8], scene.longitudinalPlan.lead1[9],
+     scene.longitudinalPlan.lead1[10], scene.longitudinalPlan.lead1[11], scene.longitudinalPlan.lead1[12]);
+    ui_print(s, ui_viz_rx, ui_viz_ry+680, "C: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+     scene.longitudinalPlan.cruisetg[0], scene.longitudinalPlan.cruisetg[1], scene.longitudinalPlan.cruisetg[2], scene.longitudinalPlan.cruisetg[3], scene.longitudinalPlan.cruisetg[4],
+     scene.longitudinalPlan.cruisetg[5], scene.longitudinalPlan.cruisetg[6], scene.longitudinalPlan.cruisetg[7], scene.longitudinalPlan.cruisetg[8], scene.longitudinalPlan.cruisetg[9],
+     scene.longitudinalPlan.cruisetg[10], scene.longitudinalPlan.cruisetg[11], scene.longitudinalPlan.cruisetg[12]);
+    ui_print(s, ui_viz_rx, ui_viz_ry+720, "X: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+     scene.longitudinalPlan.e2ex[0], scene.longitudinalPlan.e2ex[1], scene.longitudinalPlan.e2ex[2], scene.longitudinalPlan.e2ex[3], scene.longitudinalPlan.e2ex[4],
+     scene.longitudinalPlan.e2ex[5], scene.longitudinalPlan.e2ex[6], scene.longitudinalPlan.e2ex[7], scene.longitudinalPlan.e2ex[8], scene.longitudinalPlan.e2ex[9],
+     scene.longitudinalPlan.e2ex[10], scene.longitudinalPlan.e2ex[11], scene.longitudinalPlan.e2ex[12]);
+    ui_print(s, ui_viz_rx, ui_viz_ry+760, "S: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+     scene.longitudinalPlan.stopline[0], scene.longitudinalPlan.stopline[1], scene.longitudinalPlan.stopline[2], scene.longitudinalPlan.stopline[3], scene.longitudinalPlan.stopline[4],
+     scene.longitudinalPlan.stopline[5], scene.longitudinalPlan.stopline[6], scene.longitudinalPlan.stopline[7], scene.longitudinalPlan.stopline[8], scene.longitudinalPlan.stopline[9],
+     scene.longitudinalPlan.stopline[10], scene.longitudinalPlan.stopline[11], scene.longitudinalPlan.stopline[12]);
+    ui_print(s, ui_viz_rx, ui_viz_ry+800, "P:%.1f", scene.longitudinalPlan.stopprob);
+  }
     nvgFontSize(s->vg, 50);
     nvgTextAlign(s->vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
@@ -1147,9 +1192,14 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
   if (0 < scene.gear_step && scene.gear_step < 9) {
     //char val_str[16];
     //char uom_str[6];
-    std::string trans_gear_val = "S " + std::to_string(int(scene.gear_step));
+    std::string main_val = "";
+    if (scene.charge_meter > 0) {
+      main_val = std::to_string(int(scene.charge_meter)) + "%";  
+    } else {
+      main_val = "S " + std::to_string(int(scene.gear_step));
+    }
     std::string gap = "";
-    NVGcolor val_color = COLOR_YELLOW_ALPHA(200);
+    NVGcolor val_color = COLOR_YELLOW_ALPHA(230);
     NVGcolor uom_color2 = COLOR_WHITE_ALPHA(200);
     if (scene.cruise_gap == 1) {
       uom_color2 = COLOR_RED_ALPHA(240);
@@ -1163,7 +1213,7 @@ static void bb_ui_draw_measures_left(UIState *s, int bb_x, int bb_y, int bb_w ) 
     } else {
       gap = "■■■■";
     }
-    bb_ry +=bb_ui_draw_measure(s, trans_gear_val.c_str(), gap.c_str(), "GEAR",
+    bb_ry +=bb_ui_draw_measure(s, main_val.c_str(), gap.c_str(), scene.charge_meter>0?"MAIN BAT":"GEAR",
         bb_rx, bb_ry, bb_uom_dx,
         val_color, lab_color, uom_color2,
         value_fontSize, label_fontSize, uom_fontSize, 2);
@@ -1902,6 +1952,9 @@ static void ui_draw_vision(UIState *s) {
   }
   if (scene->cal_view) {
     ui_draw_grid(s);
+  }
+  if (s->scene.stop_line && !scene->comma_stock_ui) {
+    ui_draw_stop_sign(s);
   }
 }
 

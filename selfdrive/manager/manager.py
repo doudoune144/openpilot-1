@@ -79,6 +79,7 @@ def manager_init() -> None:
     ("TorqueFriction", "5"),
     ("TorqueUseAngle", "1"),
     ("TorqueMaxLatAccel", "28"),
+    ("TorqueAngDeadZone", "10"),
     ("CameraOffsetAdj", "60"),
     ("PathOffsetAdj", "0"),
     ("SteerRatioAdj", "1550"),
@@ -152,10 +153,10 @@ def manager_init() -> None:
     ("DynamicTRSet", "1.3,1.4,1.5,1.6,1.7"),
     ("OpkrBattLess", "0"),
     ("LCTimingFactorUD", "1"),
-    ("LCTimingFactor30", "10"),
-    ("LCTimingFactor60", "20"),
-    ("LCTimingFactor80", "70"),
-    ("LCTimingFactor110", "100"),
+    ("LCTimingFactor30", "30"),
+    ("LCTimingFactor60", "70"),
+    ("LCTimingFactor80", "90"),
+    ("LCTimingFactor110", "120"),
     ("OpkrUIBrightnessOff", "10"),
     ("LCTimingFactorEnable", "1"),
     ("AutoEnableSpeed", "3"),
@@ -225,6 +226,8 @@ def manager_init() -> None:
     ("SpeedCameraOffset", "0"),
     ("HoldForSetting", "1"),
     ("RTShield", "1"),
+    ("OSMOfflineUse", "0"),
+    ("StopAtStopSign", "0"),
    ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
